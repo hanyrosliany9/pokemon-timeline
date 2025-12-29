@@ -33,7 +33,7 @@ export default function AddIncomeDialog({ isOpen, onClose }: AddIncomeDialogProp
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    currency: 'USDT' as Currency,
+    currency: Currency.USDT,
     incomeDate: new Date().toISOString().split('T')[0],
     notes: '',
     tags: '',
@@ -94,7 +94,7 @@ export default function AddIncomeDialog({ isOpen, onClose }: AddIncomeDialogProp
       setFormData({
         description: '',
         amount: '',
-        currency: 'USDT',
+        currency: Currency.USDT,
         incomeDate: new Date().toISOString().split('T')[0],
         notes: '',
         tags: '',

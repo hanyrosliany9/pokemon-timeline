@@ -1,7 +1,5 @@
 import { io, Socket } from 'socket.io-client'
-import * as Shared from '@pokemon-timeline/shared'
-
-const { WebSocketEvent } = Shared
+import { WebSocketEvent } from '@pokemon-timeline/shared'
 
 class WebSocketService {
   private socket: Socket | null = null

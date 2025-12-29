@@ -24,7 +24,7 @@ export default function ExpenseList({ expenses }: ExpenseListProps) {
   const filteredExpenses = useMemo(() => {
     return expenses.filter((expense) => {
       // Category filter
-      if (categoryFilter !== 'ALL' && expense.category !== categoryFilter) {
+      if (categoryFilter !== 'ALL' && expense.categoryId !== categoryFilter) {
         return false
       }
 
