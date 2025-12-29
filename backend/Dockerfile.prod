@@ -63,9 +63,8 @@ RUN npm ci --omit=dev && \
 
 # Copy built backend application from builder
 COPY --from=builder /app/backend/dist ./backend/dist
-COPY --from=builder /app/backend/node_modules/.prisma ./backend/node_modules/.prisma
 
-# Copy prisma schema
+# Copy prisma schema (required for runtime)
 COPY backend/prisma ./backend/prisma
 
 # Set working directory to backend
