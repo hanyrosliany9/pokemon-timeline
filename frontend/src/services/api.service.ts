@@ -34,23 +34,23 @@ class ApiService {
     )
   }
 
-  get<T = any>(url: string, config = {}): Promise<T> {
+  async get<T = any>(url: string, config = {}): Promise<T> {
     return this.client.get<T>(url, config)
   }
 
-  post<T = any>(url: string, data?: any, config = {}): Promise<T> {
+  async post<T = any>(url: string, data?: any, config = {}): Promise<T> {
     return this.client.post<T>(url, data, config)
   }
 
-  patch<T = any>(url: string, data?: any, config = {}): Promise<T> {
+  async patch<T = any>(url: string, data?: any, config = {}): Promise<T> {
     return this.client.patch<T>(url, data, config)
   }
 
-  put<T = any>(url: string, data?: any, config = {}): Promise<T> {
+  async put<T = any>(url: string, data?: any, config = {}): Promise<T> {
     return this.client.put<T>(url, data, config)
   }
 
-  delete<T = any>(url: string, config = {}): Promise<T> {
+  async delete<T = any>(url: string, config = {}): Promise<T> {
     return this.client.delete<T>(url, config)
   }
 

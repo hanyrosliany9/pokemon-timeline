@@ -1,5 +1,5 @@
 import { useState, memo } from 'react'
-import { Expense } from '@pokemon-timeline/shared'
+import { Expense, Currency } from '@pokemon-timeline/shared'
 import { useStore } from '@/store/store'
 import expenseService from '@/services/expense.service'
 import { Trash2, Edit } from 'lucide-react'
@@ -18,24 +18,18 @@ function ExpenseCard({ expense }: ExpenseCardProps) {
   const [showEditModal, setShowEditModal] = useState(false)
 
   const date = new Date(expense.expenseDate).toLocaleDateString()
-  const amount = preferredCurrency === 'USDT' ? expense.amountUSDT : expense.amountIDR
-  const symbol = preferredCurrency === 'USDT' ? '$' : 'Rp'
+  const amount = preferredCurrency === Currency.USDT ? expense.amountUSDT : expense.amountIDR
+  const symbol = preferredCurrency === Currency.USDT ? '$' : 'Rp'
 
   const handleDelete = async () => {
     try {
       setDeleting(true)
       await expenseService.delete(expense.id)
       deleteExpense(expense.id)
-      showToast({
-        message: `Expense deleted: ${expense.description}`,
-        type: 'success',
-      })
+      showToast('success', `Expense deleted: ${expense.description}`)
       setShowDeleteConfirm(false)
     } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to delete expense',
-        type: 'error',
-      })
+      showToast('error', error instanceof Error ? error.message : 'Failed to delete expense')
     } finally {
       setDeleting(false)
     }

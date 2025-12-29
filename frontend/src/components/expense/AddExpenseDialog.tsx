@@ -41,7 +41,7 @@ export default function AddExpenseDialog({ isOpen, onClose }: AddExpenseDialogPr
     description: '',
     categoryId: defaultCategoryId,
     amount: '',
-    currency: 'USDT' as Currency,
+    currency: Currency.USDT,
     expenseDate: new Date().toISOString().split('T')[0],
     notes: '',
     tags: '',
@@ -121,7 +121,7 @@ export default function AddExpenseDialog({ isOpen, onClose }: AddExpenseDialogPr
         description: '',
         categoryId: newDefaultCategoryId,
         amount: '',
-        currency: 'USDT',
+        currency: Currency.USDT,
         expenseDate: new Date().toISOString().split('T')[0],
         notes: '',
         tags: '',
@@ -205,8 +205,8 @@ export default function AddExpenseDialog({ isOpen, onClose }: AddExpenseDialogPr
                   <SelectValue className="text-text-primary" />
                 </SelectTrigger>
                 <SelectContent className="bg-bg-secondary border-border">
-                  <SelectItem value="USDT" className="text-text-primary">USDT</SelectItem>
-                  <SelectItem value="IDR" className="text-text-primary">IDR</SelectItem>
+                  <SelectItem value={Currency.USDT} className="text-text-primary">USDT</SelectItem>
+                  <SelectItem value={Currency.IDR} className="text-text-primary">IDR</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -3,6 +3,8 @@ import { Currency } from '@pokemon-timeline/shared'
 import { useStore } from '@/store/store'
 import expenseService from '@/services/expense.service'
 
+import { ToastType } from '@/store/slices/ui.slice'
+
 interface AddExpenseModalProps {
   isOpen: boolean
   onClose: () => void
@@ -16,7 +18,7 @@ export default function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProp
     description: '',
     categoryId: '',
     amount: '',
-    currency: 'USDT' as Currency,
+    currency: Currency.USDT,
     expenseDate: new Date().toISOString().split('T')[0],
     notes: '',
     tags: '',
@@ -47,10 +49,7 @@ export default function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProp
     e.preventDefault()
 
     if (!formData.description.trim() || !formData.amount || !formData.categoryId) {
-      showToast({
-        message: 'Please fill in description, amount, and category',
-        type: 'error',
-      })
+      showToast('error', 'Please fill in description, amount, and category')
       return
     }
 
@@ -74,10 +73,7 @@ export default function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProp
 
       await expenseService.create(expenseData)
 
-      showToast({
-        message: `Expense added: ${formData.description}`,
-        type: 'success',
-      })
+      showToast('success', `Expense added: ${formData.description}`)
 
       const miscCategory = categories.find((c) => c.name === 'MISCELLANEOUS')
       const defaultId = miscCategory ? miscCategory.id : (categories[0]?.id || '')
@@ -86,7 +82,7 @@ export default function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProp
         description: '',
         categoryId: defaultId,
         amount: '',
-        currency: 'USDT',
+        currency: Currency.USDT,
         expenseDate: new Date().toISOString().split('T')[0],
         notes: '',
         tags: '',
@@ -94,10 +90,7 @@ export default function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProp
 
       onClose()
     } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to add expense',
-        type: 'error',
-      })
+      showToast('error', error instanceof Error ? error.message : 'Failed to add expense')
     } finally {
       setLoading(false)
     }

@@ -16,7 +16,7 @@ export default function UpdateExpenseModal({ isOpen, onClose, expense }: UpdateE
     description: '',
     amount: '',
     categoryId: '',
-    currency: 'USDT' as Currency,
+    currency: Currency.USDT,
     expenseDate: new Date().toISOString().split('T')[0],
     notes: '',
     tags: '',
@@ -69,10 +69,7 @@ export default function UpdateExpenseModal({ isOpen, onClose, expense }: UpdateE
     if (!expense) return
 
     if (!formData.description.trim() || !formData.amount || !formData.categoryId) {
-      showToast({
-        message: 'Please fill in description, amount, and category',
-        type: 'error',
-      })
+      showToast('error', 'Please fill in description, amount, and category')
       return
     }
 
@@ -96,17 +93,11 @@ export default function UpdateExpenseModal({ isOpen, onClose, expense }: UpdateE
 
       await expenseService.update(expense.id, updateData)
 
-      showToast({
-        message: `Expense updated: ${formData.description}`,
-        type: 'success',
-      })
+      showToast('success', `Expense updated: ${formData.description}`)
 
       onClose()
     } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to update expense',
-        type: 'error',
-      })
+      showToast('error', error instanceof Error ? error.message : 'Failed to update expense')
     } finally {
       setLoading(false)
     }
@@ -164,8 +155,8 @@ export default function UpdateExpenseModal({ isOpen, onClose, expense }: UpdateE
                 value={formData.currency}
                 onChange={handleInputChange}
               >
-                <option value="USDT">USDT</option>
-                <option value="IDR">IDR</option>
+                <option value={Currency.USDT}>USDT</option>
+                <option value={Currency.IDR}>IDR</option>
               </select>
             </div>
           </div>

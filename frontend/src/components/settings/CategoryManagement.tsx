@@ -27,16 +27,10 @@ export default function CategoryManagement() {
       setDeleting(true)
       await categoryService.delete(categoryId)
       removeCategory(categoryId)
-      showToast({
-        message: 'Category deleted successfully',
-        type: 'success',
-      })
+      showToast('success', 'Category deleted successfully')
       setDeleteConfirm(null)
     } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to delete category',
-        type: 'error',
-      })
+      showToast('error', error instanceof Error ? error.message : 'Failed to delete category')
     } finally {
       setDeleting(false)
     }

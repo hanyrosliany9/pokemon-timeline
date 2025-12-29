@@ -72,42 +72,27 @@ export default function CategoryModal({ isOpen, onClose, category }: CategoryMod
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) {
-      showToast({
-        message: 'Please enter a category name (e.g., MOTION_WORK)',
-        type: 'error',
-      })
+      showToast('error', 'Please enter a category name (e.g., MOTION_WORK)')
       return false
     }
 
     if (!/^[A-Z_]+$/.test(formData.name)) {
-      showToast({
-        message: 'Category name must be uppercase with underscores only (e.g., MOTION_WORK)',
-        type: 'error',
-      })
+      showToast('error', 'Category name must be uppercase with underscores only (e.g., MOTION_WORK)')
       return false
     }
 
     if (!formData.label.trim()) {
-      showToast({
-        message: 'Please enter a display label (e.g., Motion Work)',
-        type: 'error',
-      })
+      showToast('error', 'Please enter a display label (e.g., Motion Work)')
       return false
     }
 
     if (!formData.icon.trim()) {
-      showToast({
-        message: 'Please select an icon',
-        type: 'error',
-      })
+      showToast('error', 'Please select an icon')
       return false
     }
 
     if (!/^#[0-9a-fA-F]{6}$/.test(formData.color)) {
-      showToast({
-        message: 'Please enter a valid hex color (e.g., #3b82f6)',
-        type: 'error',
-      })
+      showToast('error', 'Please enter a valid hex color (e.g., #3b82f6)')
       return false
     }
 
@@ -134,25 +119,16 @@ export default function CategoryModal({ isOpen, onClose, category }: CategoryMod
       if (category) {
         // Update existing category
         await categoryService.update(category.id, categoryData)
-        showToast({
-          message: `Category updated: ${formData.label}`,
-          type: 'success',
-        })
+        showToast('success', `Category updated: ${formData.label}`)
       } else {
         // Create new category
         await categoryService.create(categoryData)
-        showToast({
-          message: `Category created: ${formData.label}`,
-          type: 'success',
-        })
+        showToast('success', `Category created: ${formData.label}`)
       }
 
       onClose()
     } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to save category',
-        type: 'error',
-      })
+      showToast('error', error instanceof Error ? error.message : 'Failed to save category')
     } finally {
       setLoading(false)
     }

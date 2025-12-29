@@ -15,7 +15,7 @@ export default function UpdateIncomeModal({ isOpen, onClose, income }: UpdateInc
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    currency: 'USDT' as Currency,
+    currency: Currency.USDT,
     incomeDate: new Date().toISOString().split('T')[0],
     notes: '',
     tags: '',
@@ -47,10 +47,7 @@ export default function UpdateIncomeModal({ isOpen, onClose, income }: UpdateInc
     e.preventDefault()
 
     if (!formData.description.trim() || !formData.amount) {
-      showToast({
-        message: 'Please fill in description and amount',
-        type: 'error',
-      })
+      showToast('error', 'Please fill in description and amount')
       return
     }
 
@@ -73,17 +70,11 @@ export default function UpdateIncomeModal({ isOpen, onClose, income }: UpdateInc
 
       await incomeService.update(income.id, updateData)
 
-      showToast({
-        message: `Income updated: ${formData.description}`,
-        type: 'success',
-      })
+      showToast('success', `Income updated: ${formData.description}`)
 
       onClose()
     } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to update income',
-        type: 'error',
-      })
+      showToast('error', error instanceof Error ? error.message : 'Failed to update income')
     } finally {
       setLoading(false)
     }
@@ -124,8 +115,8 @@ export default function UpdateIncomeModal({ isOpen, onClose, income }: UpdateInc
                 value={formData.currency}
                 onChange={handleInputChange}
               >
-                <option value="USDT">USDT</option>
-                <option value="IDR">IDR</option>
+                <option value={Currency.USDT}>USDT</option>
+                <option value={Currency.IDR}>IDR</option>
               </select>
             </div>
 
