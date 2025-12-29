@@ -17,9 +17,6 @@ export default defineConfig({
     },
     optimizeDeps: {
         include: ['@pokemon-timeline/shared'],
-        esbuildOptions: {
-            mainFields: ['module', 'main'],
-        },
     },
     resolve: {
         alias: {
