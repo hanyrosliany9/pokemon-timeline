@@ -9,16 +9,15 @@ ARG VITE_WS_URL
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 
-# Copy root package files for workspaces
+# Copy root package files for workspaces (includes package-lock.json)
 COPY package*.json ./
 
-# Copy shared package
-COPY shared/package*.json ./shared/
-COPY shared/tsconfig*.json ./shared/
-COPY shared/src ./shared/src
+# Copy workspace package files
+COPY shared/package.json ./shared/
+COPY frontend/package.json ./frontend/
 
-# Copy frontend package files
-COPY frontend/package*.json ./frontend/
+# Copy build config files
+COPY shared/tsconfig*.json ./shared/
 COPY frontend/tsconfig*.json ./frontend/
 COPY frontend/vite.config.ts ./frontend/
 COPY frontend/index.html ./frontend/

@@ -3,16 +3,16 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy root package files for workspaces
+# Copy root package files for workspaces (includes package-lock.json)
 COPY package*.json ./
 
-# Copy shared package
-COPY shared/package*.json ./shared/
-COPY shared/tsconfig*.json ./shared/
-COPY shared/src ./shared/src
+# Copy workspace package files
+COPY shared/package.json ./shared/
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
 
-# Copy backend package files
-COPY backend/package*.json ./backend/
+# Copy build config files
+COPY shared/tsconfig*.json ./shared/
 COPY backend/tsconfig*.json ./backend/
 COPY backend/nest-cli.json ./backend/
 
