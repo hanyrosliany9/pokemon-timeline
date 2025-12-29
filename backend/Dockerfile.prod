@@ -13,6 +13,7 @@ COPY frontend/package.json ./frontend/
 
 # Copy build config files
 COPY shared/tsconfig*.json ./shared/
+COPY shared/src ./shared/src
 COPY backend/tsconfig*.json ./backend/
 COPY backend/nest-cli.json ./backend/
 
