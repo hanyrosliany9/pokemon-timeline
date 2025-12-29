@@ -23,8 +23,9 @@ RUN npm ci
 # Build shared package first
 RUN npm run --workspace=shared build
 
-# Copy prisma schema
+# Copy prisma schema and config
 COPY backend/prisma ./backend/prisma
+COPY backend/prisma.config.ts ./backend/
 
 # Generate Prisma client
 RUN cd backend && npx prisma generate
@@ -57,8 +58,9 @@ COPY shared/package*.json ./shared/
 # Copy backend package files
 COPY backend/package*.json ./backend/
 
-# Copy prisma schema (required for Prisma client generation)
+# Copy prisma schema and config (required for Prisma client generation)
 COPY backend/prisma ./backend/prisma
+COPY backend/prisma.config.ts ./backend/
 
 # Install production dependencies only
 RUN npm ci --omit=dev && \
