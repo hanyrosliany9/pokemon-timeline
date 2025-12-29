@@ -1,0 +1,50 @@
+enum EventStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+  CANCELLED
+}
+
+enum EventType {
+  MILESTONE
+  TASK
+  DEADLINE
+  MEETING
+  DELIVERY
+}
+
+model TimelineEvent {
+  id          String      @id @default(uuid())
+  title       String
+  description String?     @db.Text
+  eventType   EventType   @default(TASK)
+  status      EventStatus @default(PENDING)
+
+  startDate   DateTime
+  endDate     DateTime?
+  dueDate     DateTime?
+
+  // Progress tracking
+  progress    Int         @default(0) // 0-100
+
+  // Dependencies
+  parentId    String?
+  parent      TimelineEvent?  @relation("EventDependencies", fields: [parentId], references: [id], onDelete: Cascade)
+  children    TimelineEvent[] @relation("EventDependencies")
+
+  // Associated expenses
+  expenses    Expense[]
+
+  // Metadata
+  tags        String[]    @default([])
+  priority    Int         @default(0) // 0-5
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([status])
+  @@index([startDate])
+  @@index([eventType])
+  @@map("timeline_events")
+}

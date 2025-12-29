@@ -1,0 +1,41 @@
+model ExchangeRate {
+  id            String   @id @default(uuid())
+
+  fromCurrency  String   // e.g., "USDT"
+  toCurrency    String   // e.g., "IDR"
+
+  rate          Decimal  @db.Decimal(20, 8)
+
+  // Source tracking
+  provider      String   // "coingecko" or "binance"
+
+  // For time-series data
+  timestamp     DateTime @default(now())
+
+  // Relations
+  expenses      Expense[]
+
+  createdAt     DateTime @default(now())
+
+  @@unique([fromCurrency, toCurrency, timestamp])
+  @@index([fromCurrency, toCurrency])
+  @@index([timestamp])
+  @@map("exchange_rates")
+}
+
+// Cache model for current rates
+model CurrencyCache {
+  id            String   @id @default(uuid())
+
+  fromCurrency  String
+  toCurrency    String
+
+  rate          Decimal  @db.Decimal(20, 8)
+  provider      String
+
+  expiresAt     DateTime
+  updatedAt     DateTime @updatedAt
+
+  @@unique([fromCurrency, toCurrency])
+  @@map("currency_cache")
+}

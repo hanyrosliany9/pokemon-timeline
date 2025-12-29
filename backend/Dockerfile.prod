@@ -1,0 +1,88 @@
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy root package files for workspaces
+COPY package*.json ./
+
+# Copy shared package
+COPY shared/package*.json ./shared/
+COPY shared/tsconfig*.json ./shared/
+COPY shared/src ./shared/src
+
+# Copy backend package files
+COPY backend/package*.json ./backend/
+COPY backend/tsconfig*.json ./backend/
+COPY backend/nest-cli.json ./backend/
+
+# Install all dependencies (workspaces)
+RUN npm ci
+
+# Build shared package first
+RUN npm run --workspace=shared build
+
+# Copy prisma schema
+COPY backend/prisma ./backend/prisma
+
+# Generate Prisma client
+RUN cd backend && npx prisma generate
+
+# Copy backend source code
+COPY backend/src ./backend/src
+
+# Build backend application
+RUN npm run --workspace=backend build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dumb-init to handle signals properly
+RUN apk add --no-cache dumb-init
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001
+
+# Copy root package files
+COPY package*.json ./
+
+# Copy shared dist (needed at runtime for types)
+COPY --from=builder /app/shared/dist ./shared/dist
+COPY shared/package*.json ./shared/
+
+# Copy backend package files
+COPY backend/package*.json ./backend/
+
+# Install production dependencies only
+RUN npm ci --omit=dev && \
+    npm cache clean --force
+
+# Copy built backend application from builder
+COPY --from=builder /app/backend/dist ./backend/dist
+COPY --from=builder /app/backend/node_modules/.prisma ./backend/node_modules/.prisma
+
+# Copy prisma schema
+COPY backend/prisma ./backend/prisma
+
+# Set working directory to backend
+WORKDIR /app/backend
+
+# Change ownership to nodejs user
+RUN chown -R nestjs:nodejs /app
+
+# Switch to non-root user
+USER nestjs
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Start application
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/main"]

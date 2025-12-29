@@ -1,0 +1,28 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install global dependencies for hot reload and development
+RUN npm install -g nodemon ts-node
+
+# Copy entire monorepo structure
+COPY package*.json ./
+COPY . .
+
+# Install dependencies (with workspaces)
+RUN npm ci --workspaces --include-workspace-root
+
+# Build shared package first
+RUN npm run --workspace=shared build
+
+# Set dummy DATABASE_URL for Prisma generate (used only for schema validation)
+ENV DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy"
+
+# Generate Prisma Client
+RUN npm run -w backend prisma:generate
+
+# Expose port
+EXPOSE 3001
+
+# Start with npm run start:dev which uses nodemon
+CMD ["npm", "run", "-w", "backend", "start:dev"]

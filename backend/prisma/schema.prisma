@@ -1,0 +1,207 @@
+// Pokemon Timeline & Expense Tracker - Prisma Schema
+// Unified schema combining timeline, expense, and currency models
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["typedSql"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// CARD PROJECTS - Simple cumulative card tracking
+// ============================================================================
+
+model CardProject {
+  id        String @id @default(uuid())
+  title     String // e.g., "Pokemon Base Set Cropping"
+  goalTotal Int    // Target number of cards (e.g., 3000)
+
+  // Auto-calculated progress (0-100%)
+  progress Int @default(0)
+
+  // Associated expenses (optional)
+  expenses Expense[]
+
+  // Card entries (daily/session progress logs)
+  entries CardEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("card_projects")
+}
+
+// ============================================================================
+// CARD ENTRIES - Log each time you complete cards
+// ============================================================================
+
+model CardEntry {
+  id        String      @id @default(uuid())
+  projectId String
+  project   CardProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  date            DateTime @db.Date       // When cards were processed
+  cardsAdded      Int                     // How many cards this session
+  cumulativeTotal Int                     // Running total after this entry
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, date])
+  @@index([projectId])
+  @@index([date])
+  @@map("card_entries")
+}
+
+// ============================================================================
+// EXPENSES
+// ============================================================================
+
+enum Currency {
+  USDT
+  IDR
+}
+
+// ============================================================================
+// EXPENSE CATEGORIES
+// ============================================================================
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g., "MOTION_WORK" (internal key)
+  label     String   // e.g., "Motion Work" (display name)
+  icon      String   // e.g., "Video" (Lucide icon name)
+  color     String   // e.g., "#007aff" (hex color)
+
+  // Relations
+  expenses  Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  description String
+
+  // Category relation (foreign key)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryId String
+
+  // Amount in original currency
+  amount   Decimal  @db.Decimal(20, 8)
+  currency Currency
+
+  // Converted amounts (cached for performance)
+  amountUSDT Decimal @db.Decimal(20, 8)
+  amountIDR  Decimal @db.Decimal(20, 2)
+
+  // Exchange rate used for conversion
+  exchangeRateId String?
+  exchangeRate   ExchangeRate? @relation(fields: [exchangeRateId], references: [id])
+
+  // Project association (optional link to card project)
+  projectId String?
+  project   CardProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  // Date tracking
+  expenseDate DateTime @default(now())
+
+  // Metadata
+  notes      String?  @db.Text
+  receiptUrl String?
+  tags       String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([expenseDate])
+  @@index([currency])
+  @@map("expenses")
+}
+
+// ============================================================================
+// INCOME
+// ============================================================================
+
+model Income {
+  id          String @id @default(uuid())
+  description String
+
+  // Amount in original currency
+  amount   Decimal  @db.Decimal(20, 8)
+  currency Currency
+
+  // Converted amounts (cached for performance)
+  amountUSDT Decimal @db.Decimal(20, 8)
+  amountIDR  Decimal @db.Decimal(20, 2)
+
+  // Date tracking
+  incomeDate DateTime @default(now())
+
+  // Metadata
+  notes String? @db.Text
+  tags  String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([incomeDate])
+  @@index([currency])
+  @@map("income")
+}
+
+// ============================================================================
+// CURRENCY & EXCHANGE RATES
+// ============================================================================
+
+model ExchangeRate {
+  id String @id @default(uuid())
+
+  fromCurrency String // e.g., "USDT"
+  toCurrency   String // e.g., "IDR"
+
+  rate Decimal @db.Decimal(20, 8)
+
+  // Source tracking
+  provider String // "coingecko" or "binance"
+
+  // For time-series data
+  timestamp DateTime @default(now())
+
+  // Relations
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([fromCurrency, toCurrency, timestamp])
+  @@index([fromCurrency, toCurrency])
+  @@index([timestamp])
+  @@map("exchange_rates")
+}
+
+// Cache model for current rates
+model CurrencyCache {
+  id String @id @default(uuid())
+
+  fromCurrency String
+  toCurrency   String
+
+  rate     Decimal @db.Decimal(20, 8)
+  provider String
+
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromCurrency, toCurrency])
+  @@map("currency_cache")
+}

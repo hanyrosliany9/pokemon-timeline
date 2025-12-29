@@ -1,0 +1,52 @@
+enum Currency {
+  USDT
+  IDR
+}
+
+enum ExpenseCategory {
+  CROPPING
+  MOTION_WORK
+  TOOLS
+  SOFTWARE
+  HARDWARE
+  OUTSOURCING
+  MISCELLANEOUS
+}
+
+model Expense {
+  id              String          @id @default(uuid())
+  description     String
+  category        ExpenseCategory
+
+  // Amount in original currency
+  amount          Decimal         @db.Decimal(20, 8)
+  currency        Currency
+
+  // Converted amounts (cached for performance)
+  amountUSDT      Decimal         @db.Decimal(20, 8)
+  amountIDR       Decimal         @db.Decimal(20, 2)
+
+  // Exchange rate used for conversion
+  exchangeRateId  String?
+  exchangeRate    ExchangeRate?   @relation(fields: [exchangeRateId], references: [id])
+
+  // Timeline association
+  timelineEventId String?
+  timelineEvent   TimelineEvent?  @relation(fields: [timelineEventId], references: [id], onDelete: SetNull)
+
+  // Date tracking
+  expenseDate     DateTime        @default(now())
+
+  // Metadata
+  notes           String?         @db.Text
+  receiptUrl      String?
+  tags            String[]        @default([])
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([category])
+  @@index([expenseDate])
+  @@index([currency])
+  @@map("expenses")
+}
