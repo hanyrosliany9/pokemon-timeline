@@ -57,15 +57,18 @@ COPY shared/package*.json ./shared/
 # Copy backend package files
 COPY backend/package*.json ./backend/
 
+# Copy prisma schema (required for Prisma client generation)
+COPY backend/prisma ./backend/prisma
+
 # Install production dependencies only
 RUN npm ci --omit=dev && \
     npm cache clean --force
 
+# Generate Prisma client
+RUN cd backend && npx prisma generate
+
 # Copy built backend application from builder
 COPY --from=builder /app/backend/dist ./backend/dist
-
-# Copy prisma schema (required for runtime)
-COPY backend/prisma ./backend/prisma
 
 # Set working directory to backend
 WORKDIR /app/backend
