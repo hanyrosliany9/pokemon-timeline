@@ -50,17 +50,22 @@ model CardEntry {
   projectId String
   project   CardProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  // Link to batch (required - cards are logged per batch)
+  batchId String
+  batch   RenderingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
   date            DateTime @db.Date       // When cards were processed
   cardsAdded      Int                     // How many cards this session
-  cumulativeTotal Int                     // Running total after this entry
+  cumulativeTotal Int                     // Running total for THIS BATCH after this entry
 
   notes String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([projectId, date])
+  @@unique([batchId, date])  // One entry per batch per day
   @@index([projectId])
+  @@index([batchId])
   @@index([date])
   @@map("card_entries")
 }
@@ -116,6 +121,7 @@ model RenderingBatch {
 
   // Relations
   expenses Expense[]
+  entries  CardEntry[]  // Card progress logs for this batch
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

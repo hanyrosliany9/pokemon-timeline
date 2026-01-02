@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { CardProject } from '@pokemon-timeline/shared'
 import { useStore } from '@/store/store'
 import projectService from '@/services/project.service'
-import LogCardsModal from './LogCardsModal'
 import EditProjectModal from './EditProjectModal'
 import ProjectDetails from './ProjectDetails'
+import BatchList from '../batch/BatchList'
+import NewBatchModal from '../batch/NewBatchModal'
+import BatchDetailModal from '../batch/BatchDetailModal'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { Layers, BarChart3 } from 'lucide-react'
 
 interface ProjectCardProps {
   project: CardProject
@@ -17,12 +20,16 @@ interface ProjectCardProps {
  * Displays a single project with progress bar and quick actions
  */
 export default function ProjectCard({ project }: ProjectCardProps) {
-  const { deleteProject } = useStore()
+  const { deleteProject, batches, selectedBatch, setSelectedBatch } = useStore()
   const { toast } = useToast()
-  const [showLogModal, setShowLogModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
+  const [showBatches, setShowBatches] = useState(false)
+  const [showNewBatch, setShowNewBatch] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Get batches for this project
+  const projectBatches = batches[project.id] || []
 
   // Get latest entry data if available
   const entries = (project as any).entries || []
@@ -102,11 +109,11 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         {/* Actions */}
         <div className="flex gap-2">
           <Button
-            onClick={() => setShowLogModal(true)}
+            onClick={() => setShowBatches(true)}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={project.progress >= 100}
           >
-            + Log Cards
+            <BarChart3 className="w-4 h-4 mr-1" />
+            Batches
           </Button>
           <Button
             variant="outline"
@@ -133,12 +140,6 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         </div>
       </div>
 
-      <LogCardsModal
-        isOpen={showLogModal}
-        onClose={() => setShowLogModal(false)}
-        project={project}
-      />
-
       <EditProjectModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
@@ -150,6 +151,45 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         onClose={() => setShowDetails(false)}
         project={project}
       />
+
+      {/* Batch List Modal */}
+      {showBatches && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-secondary rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-text-primary">
+                Batches - {project.title}
+              </h2>
+              <Button variant="ghost" onClick={() => setShowBatches(false)}>×</Button>
+            </div>
+            <BatchList
+              projectId={project.id}
+              onAddBatch={() => {
+                setShowBatches(false)
+                setShowNewBatch(true)
+              }}
+              onSelectBatch={(batch) => {
+                setSelectedBatch(batch)
+                setShowBatches(false)
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      <NewBatchModal
+        isOpen={showNewBatch}
+        onClose={() => setShowNewBatch(false)}
+        project={project}
+      />
+
+      {selectedBatch && (
+        <BatchDetailModal
+          isOpen={!!selectedBatch}
+          onClose={() => setSelectedBatch(null)}
+          batch={selectedBatch}
+        />
+      )}
     </>
   )
 }

@@ -15,14 +15,14 @@ import { UpdateEntryDto } from './dto/update-entry.dto'
 
 /**
  * Card Entry Controller
- * REST API for logging card progress
+ * REST API for logging card progress at the BATCH level
  */
 @Controller('api/entry')
 export class EntryController {
   constructor(private readonly entryService: EntryService) {}
 
   /**
-   * POST /api/entry - Log cards completed
+   * POST /api/entry - Log cards completed for a batch
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -31,7 +31,23 @@ export class EntryController {
   }
 
   /**
-   * GET /api/entry/project/:projectId - Get all entries for a project
+   * GET /api/entry/batch/:batchId - Get all entries for a batch
+   */
+  @Get('batch/:batchId')
+  findByBatch(@Param('batchId') batchId: string) {
+    return this.entryService.findByBatch(batchId)
+  }
+
+  /**
+   * GET /api/entry/batch/:batchId/stats - Get batch progress stats
+   */
+  @Get('batch/:batchId/stats')
+  getBatchStats(@Param('batchId') batchId: string) {
+    return this.entryService.getBatchStats(batchId)
+  }
+
+  /**
+   * GET /api/entry/project/:projectId - Get all entries for a project (aggregated)
    */
   @Get('project/:projectId')
   findByProject(@Param('projectId') projectId: string) {

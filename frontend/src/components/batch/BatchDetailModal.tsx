@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '@/store/store'
 import { useToast } from '@/hooks/use-toast'
 import { batchService } from '@/services/batch.service'
+import entryService from '@/services/entry.service'
 import { formatIDR } from '@/services/batchCalculator'
 import {
   RenderingBatch,
   BatchStatus,
   BATCH_STATUS_LABELS,
   BATCH_STATUS_COLORS,
+  CardEntry,
 } from '@pokemon-timeline/shared'
+import LogCardsModal from './LogCardsModal'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +38,8 @@ import {
   Clock,
   Trash2,
   Loader2,
+  Plus,
+  BarChart3,
 } from 'lucide-react'
 
 interface BatchDetailModalProps {
@@ -55,16 +60,47 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [status, setStatus] = useState<BatchStatus | null>(null)
   const [notes, setNotes] = useState('')
+  const [showLogCards, setShowLogCards] = useState(false)
+  const [entries, setEntries] = useState<CardEntry[]>([])
+  const [loadingEntries, setLoadingEntries] = useState(false)
 
   // Initialize form when batch changes
-  useState(() => {
+  useEffect(() => {
     if (batch) {
       setStatus(batch.status)
       setNotes(batch.notes || '')
     }
-  })
+  }, [batch])
+
+  // Fetch entries for this batch
+  useEffect(() => {
+    if (batch && isOpen) {
+      setLoadingEntries(true)
+      entryService.getByBatch(batch.id)
+        .then(setEntries)
+        .catch(console.error)
+        .finally(() => setLoadingEntries(false))
+    }
+  }, [batch, isOpen])
+
+  // Refresh entries after logging
+  const handleLogSuccess = () => {
+    if (batch) {
+      entryService.getByBatch(batch.id)
+        .then(setEntries)
+        .catch(console.error)
+    }
+  }
 
   if (!batch) return null
+
+  // Calculate batch progress from entries
+  const sortedEntries = [...entries].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  )
+  const latestEntry = sortedEntries[0]
+  const cardsRendered = latestEntry?.cumulativeTotal || 0
+  const progressPercent = Math.round((cardsRendered / batch.cardsCount) * 100)
 
   // Calculate actual costs from linked expenses
   const linkedExpenses = expenses.filter((e) => e.batchId === batch.id)
@@ -157,6 +193,59 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
               <div className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${BATCH_STATUS_COLORS[batch.status]}`}>
                 {BATCH_STATUS_LABELS[batch.status]}
               </div>
+            </div>
+          </div>
+
+          {/* Batch Progress - THE KEY FEATURE */}
+          <div className="p-4 bg-bg-secondary rounded-lg border border-border">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Rendering Progress
+              </h4>
+              <Button size="sm" onClick={() => setShowLogCards(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Log Cards
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-text-secondary">Cards Rendered</span>
+                <span className="font-medium">
+                  {cardsRendered.toLocaleString()} / {batch.cardsCount.toLocaleString()}
+                </span>
+              </div>
+              <div className="w-full bg-bg-primary rounded-full h-3">
+                <div
+                  className={`rounded-full h-3 transition-all duration-500 ${
+                    progressPercent >= 100 ? 'bg-green-500' : 'bg-interactive'
+                  }`}
+                  style={{ width: `${Math.min(100, progressPercent)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className={`font-bold ${progressPercent >= 100 ? 'text-green-500' : 'text-text-primary'}`}>
+                  {progressPercent}%
+                </span>
+                <span className="text-text-secondary">
+                  {batch.cardsCount - cardsRendered > 0
+                    ? `${(batch.cardsCount - cardsRendered).toLocaleString()} remaining`
+                    : 'Complete!'
+                  }
+                </span>
+              </div>
+              {loadingEntries && (
+                <div className="text-xs text-text-secondary flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading entries...
+                </div>
+              )}
+              {entries.length > 0 && (
+                <div className="text-xs text-text-secondary">
+                  {entries.length} log{entries.length !== 1 ? 's' : ''} •
+                  Last: {new Date(sortedEntries[0].date).toLocaleDateString('id-ID')}
+                </div>
+              )}
             </div>
           </div>
 
@@ -355,6 +444,15 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
           )}
         </DialogFooter>
       </DialogContent>
+
+      {/* Log Cards Modal */}
+      <LogCardsModal
+        isOpen={showLogCards}
+        onClose={() => setShowLogCards(false)}
+        batch={batch}
+        entries={entries}
+        onSuccess={handleLogSuccess}
+      />
     </Dialog>
   )
 }

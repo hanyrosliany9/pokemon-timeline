@@ -13,10 +13,12 @@ import {
 
 /**
  * Card Entry Service
- * Handles logging card progress with automatic cumulative calculation
+ * Handles logging card progress at the BATCH level.
  *
- * Key feature: When you add/update/delete an entry, all subsequent
- * entries are automatically recalculated to maintain correct running totals.
+ * Key changes:
+ * - Entries are linked to batches (not directly to projects)
+ * - Cumulative totals are calculated per batch
+ * - Project progress is aggregated from all batch entries
  */
 @Injectable()
 export class EntryService {
@@ -26,16 +28,17 @@ export class EntryService {
   ) {}
 
   /**
-   * Create a card entry with automatic cumulative calculation
+   * Create a card entry for a batch with automatic cumulative calculation
    */
   async create(dto: CreateEntryDto): Promise<CardEntry> {
-    // Validate project exists
-    const project = await this.prisma.cardProject.findUnique({
-      where: { id: dto.projectId },
+    // Validate batch exists and get project info
+    const batch = await this.prisma.renderingBatch.findUnique({
+      where: { id: dto.batchId },
+      include: { project: true },
     })
 
-    if (!project) {
-      throw new NotFoundException(`Project ${dto.projectId} not found`)
+    if (!batch) {
+      throw new NotFoundException(`Batch ${dto.batchId} not found`)
     }
 
     // Validate date using UTC+7 timezone utilities
@@ -52,10 +55,10 @@ export class EntryService {
       throw new BadRequestException('Cards added must be greater than 0')
     }
 
-    // Get previous entry to calculate cumulative
+    // Get previous entry for THIS BATCH to calculate cumulative
     const previousEntry = await this.prisma.cardEntry.findFirst({
       where: {
-        projectId: dto.projectId,
+        batchId: dto.batchId,
         date: { lt: entryDate },
       },
       orderBy: { date: 'desc' },
@@ -65,11 +68,11 @@ export class EntryService {
 
     // Use transaction for atomicity
     const entry = await this.prisma.$transaction(async (tx) => {
-      // Upsert entry (one per day per project)
+      // Upsert entry (one per day per batch)
       const newEntry = await tx.cardEntry.upsert({
         where: {
-          projectId_date: {
-            projectId: dto.projectId,
+          batchId_date: {
+            batchId: dto.batchId,
             date: entryDate,
           },
         },
@@ -80,7 +83,8 @@ export class EntryService {
           updatedAt: new Date(),
         },
         create: {
-          projectId: dto.projectId,
+          projectId: batch.projectId,
+          batchId: dto.batchId,
           date: entryDate,
           cardsAdded: dto.cardsAdded,
           cumulativeTotal,
@@ -88,25 +92,11 @@ export class EntryService {
         },
       })
 
-      // Recalculate all subsequent entries
-      await this.recalculateSubsequentEntries(tx, dto.projectId, entryDate)
+      // Recalculate all subsequent entries for this batch
+      await this.recalculateSubsequentEntries(tx, dto.batchId, entryDate)
 
-      // Update project progress percentage
-      const latestEntry = await tx.cardEntry.findFirst({
-        where: { projectId: dto.projectId },
-        orderBy: { date: 'desc' },
-      })
-
-      if (latestEntry) {
-        const progress = Math.min(
-          100,
-          Math.round((latestEntry.cumulativeTotal / project.goalTotal) * 100),
-        )
-        await tx.cardProject.update({
-          where: { id: dto.projectId },
-          data: { progress },
-        })
-      }
+      // Update project progress (aggregate from all batches)
+      await this.updateProjectProgress(tx, batch.projectId)
 
       return newEntry
     })
@@ -130,14 +120,6 @@ export class EntryService {
       throw new NotFoundException(`Entry ${id} not found`)
     }
 
-    const project = await this.prisma.cardProject.findUnique({
-      where: { id: entry.projectId },
-    })
-
-    if (!project) {
-      throw new BadRequestException('Associated project not found')
-    }
-
     const cardsAdded = dto.cardsAdded ?? entry.cardsAdded
 
     if (cardsAdded <= 0) {
@@ -147,7 +129,7 @@ export class EntryService {
     // Get previous entry to recalculate cumulative
     const previousEntry = await this.prisma.cardEntry.findFirst({
       where: {
-        projectId: entry.projectId,
+        batchId: entry.batchId,
         date: { lt: entry.date },
       },
       orderBy: { date: 'desc' },
@@ -167,25 +149,11 @@ export class EntryService {
         },
       })
 
-      // Recalculate all subsequent entries
-      await this.recalculateSubsequentEntries(tx, entry.projectId, entry.date)
+      // Recalculate all subsequent entries for this batch
+      await this.recalculateSubsequentEntries(tx, entry.batchId, entry.date)
 
-      // Update project progress percentage
-      const latestEntry = await tx.cardEntry.findFirst({
-        where: { projectId: entry.projectId },
-        orderBy: { date: 'desc' },
-      })
-
-      if (latestEntry) {
-        const progress = Math.min(
-          100,
-          Math.round((latestEntry.cumulativeTotal / project.goalTotal) * 100),
-        )
-        await tx.cardProject.update({
-          where: { id: entry.projectId },
-          data: { progress },
-        })
-      }
+      // Update project progress
+      await this.updateProjectProgress(tx, entry.projectId)
 
       return result
     })
@@ -209,35 +177,15 @@ export class EntryService {
       throw new NotFoundException(`Entry ${id} not found`)
     }
 
-    const project = await this.prisma.cardProject.findUnique({
-      where: { id: entry.projectId },
-    })
-
-    if (!project) {
-      throw new BadRequestException('Associated project not found')
-    }
-
     // Use transaction for atomic deletion
     const deletedEntry = await this.prisma.$transaction(async (tx) => {
       const result = await tx.cardEntry.delete({ where: { id } })
 
-      // Recalculate all subsequent entries
-      await this.recalculateSubsequentEntries(tx, entry.projectId, entry.date)
+      // Recalculate all subsequent entries for this batch
+      await this.recalculateSubsequentEntries(tx, entry.batchId, entry.date)
 
-      // Update project progress percentage
-      const latestEntry = await tx.cardEntry.findFirst({
-        where: { projectId: entry.projectId },
-        orderBy: { date: 'desc' },
-      })
-
-      const progress = latestEntry
-        ? Math.min(100, Math.round((latestEntry.cumulativeTotal / project.goalTotal) * 100))
-        : 0
-
-      await tx.cardProject.update({
-        where: { id: entry.projectId },
-        data: { progress },
-      })
+      // Update project progress
+      await this.updateProjectProgress(tx, entry.projectId)
 
       return result
     })
@@ -252,7 +200,19 @@ export class EntryService {
   }
 
   /**
-   * Find all entries for a project
+   * Find all entries for a batch
+   */
+  async findByBatch(batchId: string): Promise<CardEntry[]> {
+    const entries = await this.prisma.cardEntry.findMany({
+      where: { batchId },
+      orderBy: { date: 'desc' },
+    })
+
+    return entries.map((e) => this.formatEntry(e))
+  }
+
+  /**
+   * Find all entries for a project (aggregated from all batches)
    */
   async findByProject(projectId: string): Promise<CardEntry[]> {
     const entries = await this.prisma.cardEntry.findMany({
@@ -264,7 +224,7 @@ export class EntryService {
   }
 
   /**
-   * Get statistics for a project
+   * Get statistics for a project (aggregated from all batches)
    */
   async getStats(projectId: string): Promise<ProjectStats> {
     const project = await this.prisma.cardProject.findUnique({
@@ -275,35 +235,29 @@ export class EntryService {
       throw new NotFoundException(`Project ${projectId} not found`)
     }
 
-    const entries = await this.prisma.cardEntry.findMany({
+    // Get total cards processed across all batches
+    const totalResult = await this.prisma.cardEntry.aggregate({
       where: { projectId },
-      orderBy: { date: 'asc' },
+      _sum: { cardsAdded: true },
     })
 
-    if (entries.length === 0) {
-      return {
-        totalProcessed: 0,
-        goalTotal: project.goalTotal,
-        remaining: project.goalTotal,
-        percentComplete: 0,
-        averageDaily: 0,
-        daysWorked: 0,
-      }
-    }
+    const totalProcessed = totalResult._sum.cardsAdded || 0
 
-    const lastDate = new Date(entries[entries.length - 1].date)
-    const totalProcessed = entries[entries.length - 1].cumulativeTotal
+    // Get entry count for average calculation
+    const entriesCount = await this.prisma.cardEntry.count({
+      where: { projectId },
+    })
+
     const remaining = Math.max(0, project.goalTotal - totalProcessed)
     const percentComplete = Math.round((totalProcessed / project.goalTotal) * 100)
-
-    const daysWorked = entries.length
-    const averageDaily = Math.round(totalProcessed / daysWorked)
+    const daysWorked = entriesCount
+    const averageDaily = daysWorked > 0 ? Math.round(totalProcessed / daysWorked) : 0
 
     // Calculate estimated completion date
     let estimatedCompletionDate: string | undefined = undefined
     if (averageDaily > 0 && remaining > 0) {
       const daysRemaining = Math.ceil(remaining / averageDaily)
-      const completionDate = new Date(lastDate)
+      const completionDate = new Date()
       completionDate.setDate(completionDate.getDate() + daysRemaining)
       estimatedCompletionDate = completionDate.toISOString().split('T')[0]
     }
@@ -320,16 +274,81 @@ export class EntryService {
   }
 
   /**
-   * Private: Recalculate all entries after a given date
+   * Get statistics for a specific batch
+   */
+  async getBatchStats(batchId: string) {
+    const batch = await this.prisma.renderingBatch.findUnique({
+      where: { id: batchId },
+    })
+
+    if (!batch) {
+      throw new NotFoundException(`Batch ${batchId} not found`)
+    }
+
+    // Get total cards processed in this batch
+    const latestEntry = await this.prisma.cardEntry.findFirst({
+      where: { batchId },
+      orderBy: { date: 'desc' },
+    })
+
+    const totalProcessed = latestEntry?.cumulativeTotal || 0
+    const remaining = Math.max(0, batch.cardsCount - totalProcessed)
+    const percentComplete = Math.round((totalProcessed / batch.cardsCount) * 100)
+
+    // Get entry count for average calculation
+    const entriesCount = await this.prisma.cardEntry.count({
+      where: { batchId },
+    })
+
+    const averageDaily = entriesCount > 0 ? Math.round(totalProcessed / entriesCount) : 0
+
+    return {
+      batchId,
+      cardsTarget: batch.cardsCount,
+      totalProcessed,
+      remaining,
+      percentComplete,
+      averageDaily,
+      daysWorked: entriesCount,
+    }
+  }
+
+  /**
+   * Private: Update project progress based on all batch entries
+   */
+  private async updateProjectProgress(tx: any, projectId: string): Promise<void> {
+    const project = await tx.cardProject.findUnique({
+      where: { id: projectId },
+    })
+
+    if (!project) return
+
+    // Sum all cards from all batch entries
+    const totalResult = await tx.cardEntry.aggregate({
+      where: { projectId },
+      _sum: { cardsAdded: true },
+    })
+
+    const totalProcessed = totalResult._sum.cardsAdded || 0
+    const progress = Math.min(100, Math.round((totalProcessed / project.goalTotal) * 100))
+
+    await tx.cardProject.update({
+      where: { id: projectId },
+      data: { progress },
+    })
+  }
+
+  /**
+   * Private: Recalculate all entries after a given date FOR A BATCH
    */
   private async recalculateSubsequentEntries(
     tx: any,
-    projectId: string,
+    batchId: string,
     afterDate: Date,
   ): Promise<void> {
     const subsequentEntries = await tx.cardEntry.findMany({
       where: {
-        projectId,
+        batchId,
         date: { gt: afterDate },
       },
       orderBy: { date: 'asc' },
@@ -338,7 +357,7 @@ export class EntryService {
     // Get the cumulative total at the cutoff date
     const cutoffEntry = await tx.cardEntry.findFirst({
       where: {
-        projectId,
+        batchId,
         date: { lte: afterDate },
       },
       orderBy: { date: 'desc' },

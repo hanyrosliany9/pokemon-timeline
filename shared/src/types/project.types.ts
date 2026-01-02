@@ -33,16 +33,17 @@ export interface UpdateCardProjectDto {
 export interface CardEntry {
   id: string
   projectId: string
+  batchId: string        // Cards are logged per batch
   date: string           // ISO date (YYYY-MM-DD)
   cardsAdded: number     // Cards processed this session
-  cumulativeTotal: number // Running total after this entry
+  cumulativeTotal: number // Running total for THIS BATCH after this entry
   notes?: string
   createdAt: string | Date
   updatedAt: string | Date
 }
 
 export interface CreateCardEntryDto {
-  projectId: string
+  batchId: string        // Required - cards are logged per batch
   date: string           // ISO date (YYYY-MM-DD)
   cardsAdded: number
   notes?: string
@@ -65,6 +66,20 @@ export interface ProjectStats {
   percentComplete: number
   averageDaily: number
   estimatedCompletionDate?: string
+  daysWorked: number
+}
+
+/**
+ * Batch Progress Statistics
+ * Card rendering progress for a specific batch
+ */
+export interface BatchProgressStats {
+  batchId: string
+  cardsTarget: number
+  totalProcessed: number
+  remaining: number
+  percentComplete: number
+  averageDaily: number
   daysWorked: number
 }
 

@@ -1,9 +1,10 @@
 import api from './api.service'
-import { CardEntry, CreateCardEntryDto, UpdateCardEntryDto, ProjectStats } from '@pokemon-timeline/shared'
+import { CardEntry, CreateCardEntryDto, UpdateCardEntryDto, ProjectStats, BatchProgressStats } from '@pokemon-timeline/shared'
 
 /**
  * Entry Service
  * API calls for card entry (progress logging) management
+ * Cards are now logged at the BATCH level
  */
 class EntryService {
   private readonly basePath = '/api/entry'
@@ -12,6 +13,16 @@ class EntryService {
     return api.post<CardEntry>(this.basePath, data)
   }
 
+  // Batch-level methods
+  async getByBatch(batchId: string): Promise<CardEntry[]> {
+    return api.get<CardEntry[]>(`${this.basePath}/batch/${batchId}`)
+  }
+
+  async getBatchStats(batchId: string): Promise<BatchProgressStats> {
+    return api.get<BatchProgressStats>(`${this.basePath}/batch/${batchId}/stats`)
+  }
+
+  // Project-level methods (aggregated from all batches)
   async getByProject(projectId: string): Promise<CardEntry[]> {
     return api.get<CardEntry[]>(`${this.basePath}/project/${projectId}`)
   }
