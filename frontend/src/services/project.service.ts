@@ -1,5 +1,6 @@
 import api from './api.service'
 import { CardProject, CreateCardProjectDto, UpdateCardProjectDto } from '@pokemon-timeline/shared'
+import { normalizeProject } from '@/lib/decimal-normalizer'
 
 /**
  * Project Service
@@ -9,23 +10,28 @@ class ProjectService {
   private readonly basePath = '/api/project'
 
   async getAll(): Promise<CardProject[]> {
-    return api.get<CardProject[]>(this.basePath)
+    const projects = await api.get<CardProject[]>(this.basePath)
+    return projects.map(normalizeProject)
   }
 
   async getOne(id: string): Promise<CardProject> {
-    return api.get<CardProject>(`${this.basePath}/${id}`)
+    const project = await api.get<CardProject>(`${this.basePath}/${id}`)
+    return normalizeProject(project)
   }
 
   async create(data: CreateCardProjectDto): Promise<CardProject> {
-    return api.post<CardProject>(this.basePath, data)
+    const project = await api.post<CardProject>(this.basePath, data)
+    return normalizeProject(project)
   }
 
   async update(id: string, data: UpdateCardProjectDto): Promise<CardProject> {
-    return api.patch<CardProject>(`${this.basePath}/${id}`, data)
+    const project = await api.patch<CardProject>(`${this.basePath}/${id}`, data)
+    return normalizeProject(project)
   }
 
   async delete(id: string): Promise<CardProject> {
-    return api.delete<CardProject>(`${this.basePath}/${id}`)
+    const project = await api.delete<CardProject>(`${this.basePath}/${id}`)
+    return normalizeProject(project)
   }
 
   async getStats(): Promise<{

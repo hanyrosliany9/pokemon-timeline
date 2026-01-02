@@ -1,5 +1,6 @@
 import { RenderingBatch, BatchStatus, BATCH_STATUS_LABELS, BATCH_STATUS_COLORS } from '@pokemon-timeline/shared'
 import { formatIDR } from '@/services/batchCalculator'
+import { formatShortDate, safeParseDate } from '@/lib/utils'
 import { Calendar, Hash, Cloud, CheckCircle2, Clock, XCircle } from 'lucide-react'
 
 interface BatchCardProps {
@@ -23,9 +24,10 @@ export default function BatchCard({ batch, actualCostIDR = 0, onClick }: BatchCa
   const variance = projectedCost - actualCostIDR
   const variancePercent = projectedCost > 0 ? (variance / projectedCost) * 100 : 0
 
-  const deadlineDate = new Date(batch.deadlineAt)
+  const deadlineDate = safeParseDate(batch.deadlineAt)
   const isOverdue = batch.status !== BatchStatus.COMPLETED &&
     batch.status !== BatchStatus.CANCELLED &&
+    deadlineDate !== null &&
     deadlineDate < new Date()
 
   const StatusIcon = {
@@ -61,10 +63,7 @@ export default function BatchCard({ batch, actualCostIDR = 0, onClick }: BatchCa
           {/* Deadline */}
           <div className={`flex items-center gap-1 text-xs ${isOverdue ? 'text-red-500' : 'text-text-secondary'}`}>
             <Calendar className="h-3 w-3" />
-            {deadlineDate.toLocaleDateString('id-ID', {
-              month: 'short',
-              day: 'numeric',
-            })}
+            {formatShortDate(batch.deadlineAt)}
           </div>
         </div>
 

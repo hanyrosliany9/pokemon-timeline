@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast'
 import { batchService } from '@/services/batch.service'
 import entryService from '@/services/entry.service'
 import { formatIDR } from '@/services/batchCalculator'
+import { formatFullDate, formatShortDate, safeParseDate } from '@/lib/utils'
 import {
   RenderingBatch,
   BatchStatus,
@@ -11,7 +12,6 @@ import {
   BATCH_STATUS_COLORS,
   CardEntry,
 } from '@pokemon-timeline/shared'
-import { Decimal } from 'decimal.js'
 import LogCardsModal from './LogCardsModal'
 
 // Safe number parsing helper - returns 0 for null/undefined/NaN
@@ -108,9 +108,7 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
   // Calculate price per card in IDR
   const pricePerCardIDR = useMemo(() => {
     if (!project?.pricePerCardUSDT) return 0
-    const priceUSDT = typeof project.pricePerCardUSDT === 'object'
-      ? new Decimal(0).plus(project.pricePerCardUSDT as any).toNumber()
-      : parseFloat(String(project.pricePerCardUSDT))
+    const priceUSDT = parseFloat(String(project.pricePerCardUSDT))
     if (isNaN(priceUSDT) || priceUSDT <= 0) return 0
     const rate = parseFloat(exchangeRate) || 16000
     return priceUSDT * rate
@@ -183,7 +181,7 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
     }
   }
 
-  const deadlineDate = new Date(batch.deadlineAt)
+  const deadlineDate = safeParseDate(batch.deadlineAt)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -208,11 +206,7 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
                 Deadline
               </p>
               <p className="font-medium">
-                {deadlineDate.toLocaleDateString('id-ID', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {formatFullDate(batch.deadlineAt)}
               </p>
             </div>
             <div>
@@ -270,7 +264,7 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
               {entries.length > 0 && (
                 <div className="text-xs text-text-secondary">
                   {entries.length} log{entries.length !== 1 ? 's' : ''} •
-                  Last: {new Date(sortedEntries[0].date).toLocaleDateString('id-ID')}
+                  Last: {formatShortDate(sortedEntries[0].date)}
                 </div>
               )}
             </div>

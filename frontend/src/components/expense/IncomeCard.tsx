@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Income } from '@pokemon-timeline/shared'
 import { useStore } from '@/store/store'
 import incomeService from '@/services/income.service'
+import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,7 +29,7 @@ function IncomeCard({ income, onEdit }: IncomeCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const date = new Date(income.incomeDate).toLocaleDateString()
+  const date = formatDate(income.incomeDate)
   const amount = preferredCurrency === 'USDT' ? income.amountUSDT : income.amountIDR
   const symbol = preferredCurrency === 'USDT' ? '$' : 'Rp'
 

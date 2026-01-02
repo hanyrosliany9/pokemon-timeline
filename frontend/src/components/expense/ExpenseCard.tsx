@@ -2,6 +2,7 @@ import { useState, memo } from 'react'
 import { Expense, Currency } from '@pokemon-timeline/shared'
 import { useStore } from '@/store/store'
 import expenseService from '@/services/expense.service'
+import { formatDate } from '@/lib/utils'
 import { Trash2, Edit } from 'lucide-react'
 import { CategoryBadge } from '@/lib/category-icons'
 import UpdateExpenseModal from './UpdateExpenseModal'
@@ -17,7 +18,7 @@ function ExpenseCard({ expense }: ExpenseCardProps) {
   const [deleting, setDeleting] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
-  const date = new Date(expense.expenseDate).toLocaleDateString()
+  const date = formatDate(expense.expenseDate)
   const amount = preferredCurrency === Currency.USDT ? expense.amountUSDT : expense.amountIDR
   const symbol = preferredCurrency === Currency.USDT ? '$' : 'Rp'
 

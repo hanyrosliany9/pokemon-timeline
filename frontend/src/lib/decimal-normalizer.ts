@@ -62,3 +62,15 @@ export function normalizeIncome(income: any) {
     amountIDR: normalizeDecimalValue(income.amountIDR),
   }
 }
+
+/**
+ * Normalizes a Project object to ensure Decimal fields are converted to strings
+ */
+export function normalizeProject(project: any) {
+  return {
+    ...project,
+    pricePerCardUSDT: project.pricePerCardUSDT
+      ? normalizeDecimalValue(project.pricePerCardUSDT)
+      : null,
+  }
+}
