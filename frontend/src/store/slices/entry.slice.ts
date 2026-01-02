@@ -13,10 +13,14 @@ export interface EntrySlice {
   deleteEntry: (id: string, projectId: string) => void
   setStats: (projectId: string, stats: ProjectStats) => void
 
-  // Computed
+  // Computed - Project level
   getEntriesByProject: (projectId: string) => CardEntry[]
   getStatsByProject: (projectId: string) => ProjectStats | undefined
   getLatestEntry: (projectId: string) => CardEntry | undefined
+
+  // Computed - Batch level (for P&L calculations)
+  getEntriesByBatch: (batchId: string) => CardEntry[]
+  getCardsRenderedByBatch: (batchId: string) => number
 }
 
 export const createEntrySlice: StateCreator<EntrySlice, [], [], EntrySlice> = (set, get) => ({
@@ -77,5 +81,22 @@ export const createEntrySlice: StateCreator<EntrySlice, [], [], EntrySlice> = (s
   getLatestEntry: (projectId) => {
     const entries = get().entries[projectId] || []
     return entries[0] // Already sorted by date desc
+  },
+
+  // Batch-level computed (for P&L)
+  getEntriesByBatch: (batchId) => {
+    // Flatten all project entries and filter by batchId
+    const allEntries = Object.values(get().entries).flat()
+    return allEntries.filter((e) => e.batchId === batchId)
+  },
+
+  getCardsRenderedByBatch: (batchId) => {
+    const batchEntries = Object.values(get().entries).flat().filter((e) => e.batchId === batchId)
+    if (batchEntries.length === 0) return 0
+    // Get the latest entry's cumulative total
+    const sorted = [...batchEntries].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    return sorted[0]?.cumulativeTotal || 0
   },
 })

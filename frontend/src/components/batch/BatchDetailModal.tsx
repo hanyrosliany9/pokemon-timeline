@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useStore } from '@/store/store'
 import { useToast } from '@/hooks/use-toast'
 import { batchService } from '@/services/batch.service'
@@ -11,6 +11,7 @@ import {
   BATCH_STATUS_COLORS,
   CardEntry,
 } from '@pokemon-timeline/shared'
+import { Decimal } from 'decimal.js'
 import LogCardsModal from './LogCardsModal'
 import {
   Dialog,
@@ -54,7 +55,7 @@ interface BatchDetailModalProps {
  */
 export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetailModalProps) {
   const { toast } = useToast()
-  const { expenses, updateBatch, deleteBatch } = useStore()
+  const { expenses, updateBatch, deleteBatch, projects, getBatchPL, exchangeRate } = useStore()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -94,6 +95,20 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
 
   if (!batch) return null
 
+  // Get project for price per card
+  const project = projects.find((p) => p.id === batch.projectId)
+
+  // Calculate price per card in IDR
+  const pricePerCardIDR = useMemo(() => {
+    if (!project?.pricePerCardUSDT) return 0
+    const priceUSDT = typeof project.pricePerCardUSDT === 'object'
+      ? new Decimal(0).plus(project.pricePerCardUSDT as any).toNumber()
+      : parseFloat(String(project.pricePerCardUSDT))
+    if (isNaN(priceUSDT) || priceUSDT <= 0) return 0
+    const rate = parseFloat(exchangeRate) || 16000
+    return priceUSDT * rate
+  }, [project?.pricePerCardUSDT, exchangeRate])
+
   // Calculate batch progress from entries
   const sortedEntries = [...entries].sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -112,6 +127,11 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
   const projectedCost = parseFloat(batch.projectedTotalCostIDR || '0')
   const variance = projectedCost - actualCostIDR
   const variancePercent = projectedCost > 0 ? (variance / projectedCost) * 100 : 0
+
+  // Compute actual P&L using the store method
+  const batchPL = useMemo(() => {
+    return getBatchPL(batch.id, expenses, cardsRendered, pricePerCardIDR)
+  }, [batch.id, expenses, cardsRendered, pricePerCardIDR, getBatchPL])
 
   const handleUpdateStatus = async () => {
     if (!status || status === batch.status) return
@@ -324,29 +344,109 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
             </div>
           </div>
 
-          {/* Profitability */}
+          {/* Profitability - Projected vs Actual */}
           <div className="p-4 bg-bg-secondary rounded-lg border border-border">
-            <h4 className="font-medium mb-3">Projected Profitability</h4>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-text-secondary">Revenue</p>
-                <p className="font-medium text-income">
-                  {formatIDR(parseFloat(batch.projectedRevenueIDR || '0'))}
-                </p>
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Profitability
+            </h4>
+
+            {/* Header row */}
+            <div className="grid grid-cols-4 gap-2 mb-2 text-xs text-text-secondary">
+              <div></div>
+              <div className="text-center">Revenue</div>
+              <div className="text-center">Profit</div>
+              <div className="text-center">Margin</div>
+            </div>
+
+            {/* Projected row */}
+            <div className="grid grid-cols-4 gap-2 items-center py-2 border-b border-border">
+              <div className="text-xs font-medium text-text-secondary">Projected</div>
+              <div className="text-center font-medium text-income">
+                {formatIDR(parseFloat(batch.projectedRevenueIDR || '0'))}
               </div>
-              <div>
-                <p className="text-xs text-text-secondary">Profit</p>
-                <p className={`font-medium ${parseFloat(batch.projectedProfitIDR || '0') >= 0 ? 'text-income' : 'text-expense'}`}>
-                  {formatIDR(parseFloat(batch.projectedProfitIDR || '0'))}
-                </p>
+              <div className={`text-center font-medium ${parseFloat(batch.projectedProfitIDR || '0') >= 0 ? 'text-income' : 'text-expense'}`}>
+                {formatIDR(parseFloat(batch.projectedProfitIDR || '0'))}
               </div>
-              <div>
-                <p className="text-xs text-text-secondary">Margin</p>
-                <p className="font-bold text-lg">
-                  {parseFloat(batch.projectedMarginPercent || '0').toFixed(1)}%
-                </p>
+              <div className="text-center font-bold">
+                {parseFloat(batch.projectedMarginPercent || '0').toFixed(1)}%
               </div>
             </div>
+
+            {/* Actual row */}
+            <div className="grid grid-cols-4 gap-2 items-center py-2 border-b border-border">
+              <div className="text-xs font-medium text-text-secondary">Actual</div>
+              <div className="text-center font-medium">
+                {batchPL && batchPL.actualRevenueIDR > 0
+                  ? <span className="text-income">{formatIDR(batchPL.actualRevenueIDR)}</span>
+                  : <span className="text-text-tertiary">-</span>
+                }
+              </div>
+              <div className="text-center font-medium">
+                {batchPL && (batchPL.actualCostIDR > 0 || batchPL.actualRevenueIDR > 0)
+                  ? <span className={batchPL.actualProfitIDR >= 0 ? 'text-income' : 'text-expense'}>
+                      {formatIDR(batchPL.actualProfitIDR)}
+                    </span>
+                  : <span className="text-text-tertiary">-</span>
+                }
+              </div>
+              <div className="text-center font-bold">
+                {batchPL && batchPL.actualRevenueIDR > 0
+                  ? `${batchPL.actualMarginPercent.toFixed(1)}%`
+                  : '-'
+                }
+              </div>
+            </div>
+
+            {/* Variance row */}
+            {batchPL && (batchPL.actualCostIDR > 0 || batchPL.actualRevenueIDR > 0) && (
+              <div className="grid grid-cols-4 gap-2 items-center py-2">
+                <div className="text-xs font-medium text-text-secondary">Variance</div>
+                <div className="text-center text-xs text-text-secondary">
+                  {cardsRendered} / {batch.cardsCount} cards
+                </div>
+                <div className={`text-center font-medium ${batchPL.profitVarianceIDR >= 0 ? 'text-income' : 'text-expense'}`}>
+                  {batchPL.profitVarianceIDR >= 0 ? '+' : ''}{formatIDR(batchPL.profitVarianceIDR)}
+                </div>
+                <div className={`text-center text-sm ${batchPL.profitVariancePercent >= 0 ? 'text-income' : 'text-expense'}`}>
+                  {batchPL.profitVariancePercent >= 0 ? '+' : ''}{batchPL.profitVariancePercent.toFixed(1)}%
+                </div>
+              </div>
+            )}
+
+            {/* Per-card metrics */}
+            {batchPL && cardsRendered > 0 && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <p className="text-xs text-text-secondary mb-2">Per Card Metrics</p>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-text-secondary">Cost/Card: </span>
+                    <span className="font-medium">
+                      {formatIDR(batchPL.actualCostPerCard)}
+                      <span className="text-xs text-text-tertiary ml-1">
+                        (proj: {formatIDR(batchPL.projectedCostPerCard)})
+                      </span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-text-secondary">Profit/Card: </span>
+                    <span className={`font-medium ${batchPL.actualProfitPerCard >= 0 ? 'text-income' : 'text-expense'}`}>
+                      {formatIDR(batchPL.actualProfitPerCard)}
+                      <span className="text-xs text-text-tertiary ml-1">
+                        (proj: {formatIDR(batchPL.projectedProfitPerCard)})
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* No price warning */}
+            {pricePerCardIDR === 0 && (
+              <p className="text-xs text-amber-500 mt-2">
+                ⚠️ Set price per card in project settings to see actual revenue
+              </p>
+            )}
           </div>
 
           {/* Status Update */}

@@ -1,6 +1,61 @@
 import { StateCreator } from 'zustand'
-import { RenderingBatch, BatchStatus } from '@pokemon-timeline/shared'
+import { RenderingBatch, BatchStatus, CardEntry } from '@pokemon-timeline/shared'
 import { Decimal } from 'decimal.js'
+
+// P&L result for a single batch
+export interface BatchPL {
+  batchId: string
+  cardsTarget: number
+  cardsRendered: number
+  progressPercent: number
+
+  // Projected (from batch creation)
+  projectedCostIDR: number
+  projectedRevenueIDR: number
+  projectedProfitIDR: number
+  projectedMarginPercent: number
+
+  // Actual (computed from expenses + entries)
+  actualCostIDR: number
+  actualRevenueIDR: number   // Based on cards rendered
+  actualProfitIDR: number
+  actualMarginPercent: number
+
+  // Variance
+  costVarianceIDR: number    // positive = under budget
+  profitVarianceIDR: number  // positive = better than expected
+  costVariancePercent: number
+  profitVariancePercent: number
+
+  // Per-card metrics
+  projectedCostPerCard: number
+  actualCostPerCard: number
+  projectedProfitPerCard: number
+  actualProfitPerCard: number
+}
+
+// Aggregated P&L for a project
+export interface ProjectPL {
+  projectId: string
+  totalBatches: number
+  completedBatches: number
+  totalCardsTarget: number
+  totalCardsRendered: number
+
+  // Aggregated projected
+  totalProjectedCostIDR: number
+  totalProjectedRevenueIDR: number
+  totalProjectedProfitIDR: number
+
+  // Aggregated actual
+  totalActualCostIDR: number
+  totalActualRevenueIDR: number
+  totalActualProfitIDR: number
+
+  // Variance
+  totalCostVarianceIDR: number
+  totalProfitVarianceIDR: number
+}
 
 export interface BatchSlice {
   batches: Record<string, RenderingBatch[]>  // keyed by projectId
@@ -17,10 +72,10 @@ export interface BatchSlice {
   // Computed getters
   getBatchesByProject: (projectId: string) => RenderingBatch[]
   getBatchById: (batchId: string) => RenderingBatch | undefined
-  getBatchActualCost: (batchId: string, expenses: { batchId?: string | null; amountIDR: string }[]) => number
+  getBatchActualCost: (batchId: string, expenses: { batchId?: string | null; amountIDR: string | number }[]) => number
   getProjectTotalProjectedCost: (projectId: string) => number
-  getProjectTotalActualCost: (projectId: string, expenses: { batchId?: string | null; amountIDR: string }[]) => number
-  getProjectStats: (projectId: string, expenses: { batchId?: string | null; amountIDR: string }[]) => {
+  getProjectTotalActualCost: (projectId: string, expenses: { batchId?: string | null; amountIDR: string | number }[]) => number
+  getProjectStats: (projectId: string, expenses: { batchId?: string | null; amountIDR: string | number }[]) => {
     totalBatches: number
     completedBatches: number
     totalCardsInBatches: number
@@ -29,6 +84,21 @@ export interface BatchSlice {
     totalProjectedRevenueIDR: number
     totalProjectedProfitIDR: number
   }
+
+  // P&L Computed Methods
+  getBatchPL: (
+    batchId: string,
+    expenses: { batchId?: string | null; amountIDR: string | number }[],
+    cardsRendered: number,
+    pricePerCardIDR: number
+  ) => BatchPL | null
+
+  getProjectPL: (
+    projectId: string,
+    expenses: { batchId?: string | null; amountIDR: string | number }[],
+    getCardsRenderedByBatch: (batchId: string) => number,
+    pricePerCardIDR: number
+  ) => ProjectPL
 }
 
 export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
@@ -103,7 +173,7 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
   getBatchActualCost: (batchId: string, expenses) => {
     return expenses
       .filter((e) => e.batchId === batchId)
-      .reduce((sum, e) => sum + parseFloat(e.amountIDR || '0'), 0)
+      .reduce((sum, e) => sum + parseFloat(String(e.amountIDR || '0')), 0)
   },
 
   getProjectTotalProjectedCost: (projectId: string) => {
@@ -118,7 +188,7 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
     const batchIds = new Set(projectBatches.map((b) => b.id))
     return expenses
       .filter((e) => e.batchId && batchIds.has(e.batchId))
-      .reduce((sum, e) => sum + parseFloat(e.amountIDR || '0'), 0)
+      .reduce((sum, e) => sum + parseFloat(String(e.amountIDR || '0')), 0)
   },
 
   getProjectStats: (projectId: string, expenses) => {
@@ -139,7 +209,7 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
     )
     const totalActualCostIDR = expenses
       .filter((e) => e.batchId && batchIds.has(e.batchId))
-      .reduce((sum, e) => sum + parseFloat(e.amountIDR || '0'), 0)
+      .reduce((sum, e) => sum + parseFloat(String(e.amountIDR || '0')), 0)
     const totalProjectedRevenueIDR = projectBatches.reduce(
       (sum, b) => new Decimal(sum).plus(b.projectedRevenueIDR || '0').toNumber(),
       0
@@ -157,6 +227,123 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
       totalActualCostIDR,
       totalProjectedRevenueIDR,
       totalProjectedProfitIDR,
+    }
+  },
+
+  // P&L Computed Methods
+  getBatchPL: (batchId, expenses, cardsRendered, pricePerCardIDR) => {
+    const batch = get().getBatchById(batchId)
+    if (!batch) return null
+
+    const cardsTarget = batch.cardsCount
+    const progressPercent = cardsTarget > 0 ? Math.round((cardsRendered / cardsTarget) * 100) : 0
+
+    // Projected values
+    const projectedCostIDR = parseFloat(batch.projectedTotalCostIDR || '0')
+    const projectedRevenueIDR = parseFloat(batch.projectedRevenueIDR || '0')
+    const projectedProfitIDR = parseFloat(batch.projectedProfitIDR || '0')
+    const projectedMarginPercent = parseFloat(batch.projectedMarginPercent || '0')
+
+    // Actual values
+    const actualCostIDR = expenses
+      .filter((e) => e.batchId === batchId)
+      .reduce((sum, e) => sum + parseFloat(String(e.amountIDR || '0')), 0)
+
+    // Actual revenue = cards rendered × price per card
+    const actualRevenueIDR = cardsRendered * pricePerCardIDR
+    const actualProfitIDR = actualRevenueIDR - actualCostIDR
+    const actualMarginPercent = actualRevenueIDR > 0
+      ? (actualProfitIDR / actualRevenueIDR) * 100
+      : 0
+
+    // Variance (positive = good)
+    const costVarianceIDR = projectedCostIDR - actualCostIDR
+    const profitVarianceIDR = actualProfitIDR - projectedProfitIDR
+    const costVariancePercent = projectedCostIDR > 0
+      ? (costVarianceIDR / projectedCostIDR) * 100
+      : 0
+    const profitVariancePercent = projectedProfitIDR > 0
+      ? (profitVarianceIDR / projectedProfitIDR) * 100
+      : 0
+
+    // Per-card metrics
+    const projectedCostPerCard = cardsTarget > 0 ? projectedCostIDR / cardsTarget : 0
+    const actualCostPerCard = cardsRendered > 0 ? actualCostIDR / cardsRendered : 0
+    const projectedProfitPerCard = cardsTarget > 0 ? projectedProfitIDR / cardsTarget : 0
+    const actualProfitPerCard = cardsRendered > 0 ? actualProfitIDR / cardsRendered : 0
+
+    return {
+      batchId,
+      cardsTarget,
+      cardsRendered,
+      progressPercent,
+      projectedCostIDR,
+      projectedRevenueIDR,
+      projectedProfitIDR,
+      projectedMarginPercent,
+      actualCostIDR,
+      actualRevenueIDR,
+      actualProfitIDR,
+      actualMarginPercent,
+      costVarianceIDR,
+      profitVarianceIDR,
+      costVariancePercent,
+      profitVariancePercent,
+      projectedCostPerCard,
+      actualCostPerCard,
+      projectedProfitPerCard,
+      actualProfitPerCard,
+    }
+  },
+
+  getProjectPL: (projectId, expenses, getCardsRenderedByBatch, pricePerCardIDR) => {
+    const projectBatches = get().batches[projectId] || []
+    const batchIds = new Set(projectBatches.map((b) => b.id))
+
+    let totalCardsTarget = 0
+    let totalCardsRendered = 0
+    let totalProjectedCostIDR = 0
+    let totalProjectedRevenueIDR = 0
+    let totalProjectedProfitIDR = 0
+    let totalActualCostIDR = 0
+    let totalActualRevenueIDR = 0
+    let totalActualProfitIDR = 0
+
+    for (const batch of projectBatches) {
+      const cardsRendered = getCardsRenderedByBatch(batch.id)
+
+      totalCardsTarget += batch.cardsCount
+      totalCardsRendered += cardsRendered
+      totalProjectedCostIDR += parseFloat(batch.projectedTotalCostIDR || '0')
+      totalProjectedRevenueIDR += parseFloat(batch.projectedRevenueIDR || '0')
+      totalProjectedProfitIDR += parseFloat(batch.projectedProfitIDR || '0')
+
+      // Actual cost from expenses linked to this batch
+      const batchActualCost = expenses
+        .filter((e) => e.batchId === batch.id)
+        .reduce((sum, e) => sum + parseFloat(String(e.amountIDR || '0')), 0)
+      totalActualCostIDR += batchActualCost
+
+      // Actual revenue from cards rendered
+      totalActualRevenueIDR += cardsRendered * pricePerCardIDR
+    }
+
+    totalActualProfitIDR = totalActualRevenueIDR - totalActualCostIDR
+
+    return {
+      projectId,
+      totalBatches: projectBatches.length,
+      completedBatches: projectBatches.filter((b) => b.status === BatchStatus.COMPLETED).length,
+      totalCardsTarget,
+      totalCardsRendered,
+      totalProjectedCostIDR,
+      totalProjectedRevenueIDR,
+      totalProjectedProfitIDR,
+      totalActualCostIDR,
+      totalActualRevenueIDR,
+      totalActualProfitIDR,
+      totalCostVarianceIDR: totalProjectedCostIDR - totalActualCostIDR,
+      totalProfitVarianceIDR: totalActualProfitIDR - totalProjectedProfitIDR,
     }
   },
 })
