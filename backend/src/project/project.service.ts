@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Decimal } from 'decimal.js'
 import { PrismaService } from '@/database/prisma.service'
 import { RedisService } from '@/redis/redis.service'
 import { CreateProjectDto } from './dto/create-project.dto'
@@ -58,6 +59,9 @@ export class ProjectService {
           title: dto.title,
           goalTotal: dto.goalTotal,
           progress: 0,
+          pricePerCardUSDT: dto.pricePerCardUSDT
+            ? new Decimal(dto.pricePerCardUSDT)
+            : null,
         },
       })
 
@@ -90,6 +94,9 @@ export class ProjectService {
         data: {
           title: dto.title,
           goalTotal: dto.goalTotal,
+          pricePerCardUSDT: dto.pricePerCardUSDT !== undefined
+            ? (dto.pricePerCardUSDT ? new Decimal(dto.pricePerCardUSDT) : null)
+            : undefined,
         },
       })
 

@@ -8,8 +8,10 @@ import { CurrencySlice, createCurrencySlice } from './slices/currency.slice'
 import { UISlice, createUISlice } from './slices/ui.slice'
 import { ThemeSlice, createThemeSlice } from './slices/theme.slice'
 import { FilterState, createFilterSlice } from './slices/filter.slice'
+import { GpuConfigSlice, createGpuConfigSlice } from './slices/gpuConfig.slice'
+import { BatchSlice, createBatchSlice } from './slices/batch.slice'
 
-export type Store = ProjectSlice & EntrySlice & CategorySlice & ExpenseSlice & CurrencySlice & UISlice & ThemeSlice & FilterState
+export type Store = ProjectSlice & EntrySlice & CategorySlice & ExpenseSlice & CurrencySlice & UISlice & ThemeSlice & FilterState & GpuConfigSlice & BatchSlice
 
 export const useStore = create<Store>()(
   devtools(
@@ -23,6 +25,8 @@ export const useStore = create<Store>()(
         ...createUISlice(...a),
         ...createThemeSlice(...a),
         ...createFilterSlice(...a),
+        ...createGpuConfigSlice(...a),
+        ...createBatchSlice(...a),
       }),
       {
         name: 'pokemon-timeline-store',
@@ -31,6 +35,7 @@ export const useStore = create<Store>()(
           theme: state.theme,
           expenses: state.expenses,
           income: state.income,
+          gpuConfig: state.gpuConfig,
         }),
       },
     ),

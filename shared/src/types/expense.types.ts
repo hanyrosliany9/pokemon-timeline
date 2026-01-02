@@ -12,6 +12,7 @@ export interface Expense {
   amountIDR: string | number
   exchangeRateId?: string
   projectId?: string
+  batchId?: string | null  // Optional link to rendering batch
   expenseDate: string | Date
   notes?: string
   receiptUrl?: string
@@ -26,6 +27,7 @@ export interface CreateExpenseDto {
   amount: string | number
   currency: Currency
   projectId?: string
+  batchId?: string  // Optional link to rendering batch
   expenseDate?: string | Date
   notes?: string
   receiptUrl?: string
@@ -38,6 +40,7 @@ export interface UpdateExpenseDto {
   amount?: string | number
   currency?: Currency
   projectId?: string
+  batchId?: string | null  // Optional link to rendering batch
   expenseDate?: string | Date
   notes?: string
   receiptUrl?: string

@@ -11,6 +11,7 @@ import { CategoryModule } from '@/category/category.module'
 import { CurrencyModule } from '@/currency/currency.module'
 import { WebSocketModule } from '@/websocket/websocket.module'
 import { TimeSyncModule } from '@/timesync/timesync.module'
+import { BatchModule } from '@/batch/batch.module'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 
@@ -30,6 +31,7 @@ import { AppService } from './app.service'
     IncomeModule,
     CurrencyModule,
     WebSocketModule,
+    BatchModule,
   ],
   controllers: [AppController],
   providers: [AppService],

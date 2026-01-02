@@ -28,6 +28,7 @@ export default function AddProjectModal({ isOpen, onClose }: AddProjectModalProp
   const [formData, setFormData] = useState({
     title: '',
     goalTotal: '',
+    pricePerCardUSDT: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,6 +59,7 @@ export default function AddProjectModal({ isOpen, onClose }: AddProjectModalProp
       await projectService.create({
         title: formData.title,
         goalTotal,
+        pricePerCardUSDT: formData.pricePerCardUSDT ? parseFloat(formData.pricePerCardUSDT) : undefined,
       })
 
       toast({
@@ -66,7 +68,7 @@ export default function AddProjectModal({ isOpen, onClose }: AddProjectModalProp
       })
 
       // Reset form
-      setFormData({ title: '', goalTotal: '' })
+      setFormData({ title: '', goalTotal: '', pricePerCardUSDT: '' })
       onClose()
     } catch (error) {
       toast({
@@ -116,6 +118,23 @@ export default function AddProjectModal({ isOpen, onClose }: AddProjectModalProp
             />
             <p className="text-xs text-text-secondary">
               How many cards do you need to complete for this project?
+            </p>
+          </div>
+
+          {/* Price Per Card */}
+          <div className="space-y-2">
+            <Label htmlFor="pricePerCardUSDT">Price Per Card (USDT)</Label>
+            <Input
+              id="pricePerCardUSDT"
+              type="number"
+              step="0.01"
+              value={formData.pricePerCardUSDT}
+              onChange={(e) => setFormData({ ...formData, pricePerCardUSDT: e.target.value })}
+              placeholder="e.g., 0.13"
+              min="0"
+            />
+            <p className="text-xs text-text-secondary">
+              Contract price per card for profit calculations (optional)
             </p>
           </div>
 

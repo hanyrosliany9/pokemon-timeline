@@ -22,11 +22,17 @@ model CardProject {
   // Auto-calculated progress (0-100%)
   progress Int @default(0)
 
+  // NEW: Price for rendering projects (contract pricing)
+  pricePerCardUSDT Decimal? @db.Decimal(20, 8)
+
   // Associated expenses (optional)
   expenses Expense[]
 
   // Card entries (daily/session progress logs)
   entries CardEntry[]
+
+  // Rendering batches
+  batches RenderingBatch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -57,6 +63,67 @@ model CardEntry {
   @@index([projectId])
   @@index([date])
   @@map("card_entries")
+}
+
+// ============================================================================
+// RENDERING BATCHES - Track batch jobs with cost projections
+// ============================================================================
+
+enum BatchStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model RenderingBatch {
+  id        String      @id @default(uuid())
+  projectId String
+  project   CardProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Batch Definition
+  batchNumber Int
+  cardsCount  Int
+  deadlineAt  DateTime
+
+  // GPU Planning (snapshot at creation)
+  useLocalGpu       Boolean @default(true)
+  cloudGpusPlanned  Int
+  cloudHoursPlanned Decimal @db.Decimal(10, 2)
+
+  // Exchange rate snapshot (for audit trail)
+  exchangeRateUsed Decimal @db.Decimal(20, 2)
+
+  // Projections (all in IDR)
+  projectedCloudCostIDR       Decimal @db.Decimal(20, 2)
+  projectedElectricityCostIDR Decimal @db.Decimal(20, 2)
+  projectedTotalCostIDR       Decimal @db.Decimal(20, 2)
+  projectedRevenueIDR         Decimal @db.Decimal(20, 2)
+  projectedProfitIDR          Decimal @db.Decimal(20, 2)
+  projectedMarginPercent      Decimal @db.Decimal(5, 2)
+
+  // Per-card metrics (IDR)
+  projectedCostPerCardIDR   Decimal @db.Decimal(20, 2)
+  projectedProfitPerCardIDR Decimal @db.Decimal(20, 2)
+
+  // Status & Timing
+  status      BatchStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Notes
+  notes String? @db.Text
+
+  // Relations
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, batchNumber])
+  @@index([projectId])
+  @@index([status])
+  @@map("rendering_batches")
 }
 
 // ============================================================================
@@ -112,6 +179,10 @@ model Expense {
   projectId String?
   project   CardProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
+  // Batch association (optional link to rendering batch)
+  batchId String?
+  batch   RenderingBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
   // Date tracking
   expenseDate DateTime @default(now())
 
@@ -126,6 +197,7 @@ model Expense {
   @@index([categoryId])
   @@index([expenseDate])
   @@index([currency])
+  @@index([batchId])
   @@map("expenses")
 }
 

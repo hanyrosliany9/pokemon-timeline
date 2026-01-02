@@ -30,6 +30,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   const [formData, setFormData] = useState({
     title: '',
     goalTotal: '',
+    pricePerCardUSDT: '',
   })
 
   // Pre-fill form when project changes
@@ -38,6 +39,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       setFormData({
         title: project.title,
         goalTotal: project.goalTotal.toString(),
+        pricePerCardUSDT: project.pricePerCardUSDT != null ? String(project.pricePerCardUSDT) : '',
       })
     }
   }, [project, isOpen])
@@ -72,6 +74,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       await projectService.update(project.id, {
         title: formData.title,
         goalTotal,
+        pricePerCardUSDT: formData.pricePerCardUSDT ? parseFloat(formData.pricePerCardUSDT) : undefined,
       })
 
       toast({
@@ -128,6 +131,23 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
             />
             <p className="text-xs text-text-secondary">
               How many cards do you need to complete for this project?
+            </p>
+          </div>
+
+          {/* Price Per Card */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-pricePerCardUSDT">Price Per Card (USDT)</Label>
+            <Input
+              id="edit-pricePerCardUSDT"
+              type="number"
+              step="0.01"
+              value={formData.pricePerCardUSDT}
+              onChange={(e) => setFormData({ ...formData, pricePerCardUSDT: e.target.value })}
+              placeholder="e.g., 0.13"
+              min="0"
+            />
+            <p className="text-xs text-text-secondary">
+              Contract price per card for profit calculations
             </p>
           </div>
 

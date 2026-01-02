@@ -8,6 +8,7 @@ export interface CardProject {
   title: string          // e.g., "Pokemon Base Set Cropping"
   goalTotal: number      // Target cards (e.g., 3000)
   progress: number       // 0-100 percentage
+  pricePerCardUSDT?: string | number | null  // Contract price per card
   createdAt: string | Date
   updatedAt: string | Date
 }
@@ -15,11 +16,13 @@ export interface CardProject {
 export interface CreateCardProjectDto {
   title: string
   goalTotal: number
+  pricePerCardUSDT?: number  // Optional contract price
 }
 
 export interface UpdateCardProjectDto {
   title?: string
   goalTotal?: number
+  pricePerCardUSDT?: number  // Optional contract price
 }
 
 /**
