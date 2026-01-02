@@ -2,6 +2,13 @@ import { StateCreator } from 'zustand'
 import { RenderingBatch, BatchStatus, CardEntry } from '@pokemon-timeline/shared'
 import { Decimal } from 'decimal.js'
 
+// Safe number parsing - returns 0 for null/undefined/NaN
+function safeParseFloat(value: string | number | null | undefined): number {
+  if (value == null) return 0
+  const parsed = typeof value === 'number' ? value : parseFloat(String(value))
+  return isNaN(parsed) || !isFinite(parsed) ? 0 : parsed
+}
+
 // P&L result for a single batch
 export interface BatchPL {
   batchId: string
@@ -179,7 +186,7 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
   getProjectTotalProjectedCost: (projectId: string) => {
     const projectBatches = get().batches[projectId] || []
     return projectBatches.reduce((sum, batch) => {
-      return sum + parseFloat(batch.projectedTotalCostIDR || '0')
+      return sum + safeParseFloat(batch.projectedTotalCostIDR)
     }, 0)
   },
 
@@ -239,10 +246,10 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
     const progressPercent = cardsTarget > 0 ? Math.round((cardsRendered / cardsTarget) * 100) : 0
 
     // Projected values
-    const projectedCostIDR = parseFloat(batch.projectedTotalCostIDR || '0')
-    const projectedRevenueIDR = parseFloat(batch.projectedRevenueIDR || '0')
-    const projectedProfitIDR = parseFloat(batch.projectedProfitIDR || '0')
-    const projectedMarginPercent = parseFloat(batch.projectedMarginPercent || '0')
+    const projectedCostIDR = safeParseFloat(batch.projectedTotalCostIDR)
+    const projectedRevenueIDR = safeParseFloat(batch.projectedRevenueIDR)
+    const projectedProfitIDR = safeParseFloat(batch.projectedProfitIDR)
+    const projectedMarginPercent = safeParseFloat(batch.projectedMarginPercent)
 
     // Actual values
     const actualCostIDR = expenses
@@ -314,9 +321,9 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
 
       totalCardsTarget += batch.cardsCount
       totalCardsRendered += cardsRendered
-      totalProjectedCostIDR += parseFloat(batch.projectedTotalCostIDR || '0')
-      totalProjectedRevenueIDR += parseFloat(batch.projectedRevenueIDR || '0')
-      totalProjectedProfitIDR += parseFloat(batch.projectedProfitIDR || '0')
+      totalProjectedCostIDR += safeParseFloat(batch.projectedTotalCostIDR)
+      totalProjectedRevenueIDR += safeParseFloat(batch.projectedRevenueIDR)
+      totalProjectedProfitIDR += safeParseFloat(batch.projectedProfitIDR)
 
       // Actual cost from expenses linked to this batch
       const batchActualCost = expenses

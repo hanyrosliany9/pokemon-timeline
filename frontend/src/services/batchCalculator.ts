@@ -153,6 +153,10 @@ export function calculateBatchEstimate(input: BatchEstimateInput): BatchEstimate
  * Format IDR currency for display
  */
 export function formatIDR(amount: number): string {
+  // Handle NaN, undefined, null, or Infinity
+  if (amount == null || !isFinite(amount) || isNaN(amount)) {
+    return 'Rp 0'
+  }
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',

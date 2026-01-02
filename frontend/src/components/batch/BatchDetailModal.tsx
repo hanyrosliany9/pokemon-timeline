@@ -13,6 +13,13 @@ import {
 } from '@pokemon-timeline/shared'
 import { Decimal } from 'decimal.js'
 import LogCardsModal from './LogCardsModal'
+
+// Safe number parsing helper - returns 0 for null/undefined/NaN
+function safeParseFloat(value: string | number | null | undefined): number {
+  if (value == null) return 0
+  const parsed = typeof value === 'number' ? value : parseFloat(String(value))
+  return isNaN(parsed) || !isFinite(parsed) ? 0 : parsed
+}
 import {
   Dialog,
   DialogContent,
@@ -124,7 +131,7 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
     0
   )
 
-  const projectedCost = parseFloat(batch.projectedTotalCostIDR || '0')
+  const projectedCost = safeParseFloat(batch.projectedTotalCostIDR)
   const variance = projectedCost - actualCostIDR
   const variancePercent = projectedCost > 0 ? (variance / projectedCost) * 100 : 0
 
@@ -289,12 +296,12 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
               </div>
               <div>
                 <p className="text-text-secondary">Cloud Hours</p>
-                <p className="font-medium">{parseFloat(batch.cloudHoursPlanned || '0')} hrs</p>
+                <p className="font-medium">{safeParseFloat(batch.cloudHoursPlanned)} hrs</p>
               </div>
               <div>
                 <p className="text-text-secondary">Exchange Rate</p>
                 <p className="font-medium text-xs">
-                  Rp {parseFloat(batch.exchangeRateUsed || '0').toLocaleString('id-ID')}
+                  Rp {safeParseFloat(batch.exchangeRateUsed).toLocaleString('id-ID')}
                 </p>
               </div>
             </div>
@@ -311,10 +318,10 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
                 <p className="text-xs text-text-secondary">Projected</p>
                 <p className="font-medium">{formatIDR(projectedCost)}</p>
                 <p className="text-xs text-text-secondary mt-1">
-                  Cloud: {formatIDR(parseFloat(batch.projectedCloudCostIDR || '0'))}
+                  Cloud: {formatIDR(safeParseFloat(batch.projectedCloudCostIDR))}
                 </p>
                 <p className="text-xs text-text-secondary">
-                  Electricity: {formatIDR(parseFloat(batch.projectedElectricityCostIDR || '0'))}
+                  Electricity: {formatIDR(safeParseFloat(batch.projectedElectricityCostIDR))}
                 </p>
               </div>
               <div>
@@ -363,13 +370,13 @@ export default function BatchDetailModal({ isOpen, onClose, batch }: BatchDetail
             <div className="grid grid-cols-4 gap-2 items-center py-2 border-b border-border">
               <div className="text-xs font-medium text-text-secondary">Projected</div>
               <div className="text-center font-medium text-income">
-                {formatIDR(parseFloat(batch.projectedRevenueIDR || '0'))}
+                {formatIDR(safeParseFloat(batch.projectedRevenueIDR))}
               </div>
-              <div className={`text-center font-medium ${parseFloat(batch.projectedProfitIDR || '0') >= 0 ? 'text-income' : 'text-expense'}`}>
-                {formatIDR(parseFloat(batch.projectedProfitIDR || '0'))}
+              <div className={`text-center font-medium ${safeParseFloat(batch.projectedProfitIDR) >= 0 ? 'text-income' : 'text-expense'}`}>
+                {formatIDR(safeParseFloat(batch.projectedProfitIDR))}
               </div>
               <div className="text-center font-bold">
-                {parseFloat(batch.projectedMarginPercent || '0').toFixed(1)}%
+                {safeParseFloat(batch.projectedMarginPercent).toFixed(1)}%
               </div>
             </div>
 
