@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js'
-import { BatchEstimate, BatchEstimateInput } from '@pokemon-timeline/shared'
+import { BatchEstimate, BatchEstimateInput, LocalGpuConfig } from '@pokemon-timeline/shared'
 
 /**
  * Batch Calculator Service
@@ -7,60 +7,87 @@ import { BatchEstimate, BatchEstimateInput } from '@pokemon-timeline/shared'
  * Pure calculation engine for estimating GPU requirements, costs, and profitability
  * for rendering batches. Uses Decimal.js for financial precision.
  *
+ * Supports multiple local GPUs and selectable cloud GPU per batch.
+ *
  * Key formulas:
  * - cards_per_day = (24 * 60) / render_time_minutes
+ * - local_capacity = SUM(cards_per_day for each selected local GPU)
  * - cloud_needed = ceil((required_per_day - local_capacity) / cloud_capacity_per_gpu)
  * - cloud_cost = cloud_gpus × deadline_days × 24 × cost_per_hour_usd × exchange_rate
- * - electricity = deadline_days × 24 × (watts / 1000) × rate_per_kwh
+ * - electricity = SUM(deadline_days × 24 × (watts / 1000) for each local GPU) × rate_per_kwh
  * - profit = revenue - total_cost
  */
 
 const MINUTES_PER_DAY = 24 * 60
+const HOURS_PER_DAY = 24
+
+/**
+ * Calculate cards per day capacity for a single GPU
+ */
+function gpuCardsPerDay(renderTimeMinutes: number): number {
+  return Math.floor(MINUTES_PER_DAY / renderTimeMinutes)
+}
+
+/**
+ * Calculate total local GPU capacity (cards per day) from selected GPUs
+ */
+function calculateLocalCapacity(localGpus: LocalGpuConfig[]): number {
+  return localGpus.reduce((total, gpu) => total + gpuCardsPerDay(gpu.renderTimeMinutes), 0)
+}
+
+/**
+ * Calculate total power draw from selected local GPUs (in Watts)
+ */
+function calculateTotalPowerDraw(localGpus: LocalGpuConfig[]): number {
+  return localGpus.reduce((total, gpu) => total + gpu.powerDrawWatts, 0)
+}
 
 export function calculateBatchEstimate(input: BatchEstimateInput): BatchEstimate {
   const {
     cardsCount,
     deadlineDays,
     pricePerCardUSDT,
-    useLocalGpu,
-    gpuConfig,
+    selectedLocalGpus,
+    selectedCloudGpu,
+    electricityRateIDR,
     exchangeRateUSDTtoIDR,
   } = input
 
   // Step 1: Calculate required throughput
   const cardsPerDayRequired = Math.ceil(cardsCount / deadlineDays)
 
-  // Step 2: Calculate local GPU capacity (cards per day)
-  const localGpuCardsPerDay = useLocalGpu && gpuConfig.local.enabled
-    ? Math.floor(MINUTES_PER_DAY / gpuConfig.local.renderTimeMinutes)
-    : 0
+  // Step 2: Calculate local GPU capacity (sum of all selected local GPUs)
+  const localGpuCardsPerDay = calculateLocalCapacity(selectedLocalGpus)
 
   // Step 3: Calculate cloud GPU needs
   const cloudCardsPerDayNeeded = Math.max(0, cardsPerDayRequired - localGpuCardsPerDay)
-  const cloudGpuCardsPerDay = Math.floor(MINUTES_PER_DAY / gpuConfig.cloud.renderTimeMinutes)
-  const cloudGpusRequired = cloudCardsPerDayNeeded > 0
-    ? Math.ceil(cloudCardsPerDayNeeded / cloudGpuCardsPerDay)
-    : 0
+
+  let cloudGpuCardsPerDay = 0
+  let cloudGpusRequired = 0
+
+  if (selectedCloudGpu && cloudCardsPerDayNeeded > 0) {
+    cloudGpuCardsPerDay = gpuCardsPerDay(selectedCloudGpu.renderTimeMinutes)
+    cloudGpusRequired = Math.ceil(cloudCardsPerDayNeeded / cloudGpuCardsPerDay)
+  }
 
   // Step 4: Calculate hours
-  const totalCloudHours = cloudGpusRequired * deadlineDays * 24
-  const totalLocalHours = useLocalGpu && gpuConfig.local.enabled
-    ? deadlineDays * 24
-    : 0
+  const totalCloudHours = cloudGpusRequired * deadlineDays * HOURS_PER_DAY
+  const totalLocalHours = selectedLocalGpus.length > 0 ? deadlineDays * HOURS_PER_DAY : 0
 
   // Step 5: Calculate costs (IDR) using Decimal.js for precision
-  const cloudCostUSD = new Decimal(totalCloudHours)
-    .times(gpuConfig.cloud.costPerHourUSD)
-  const cloudCostIDR = cloudCostUSD
-    .times(exchangeRateUSDTtoIDR)
-    .round()
-    .toNumber()
+  let cloudCostIDR = 0
+  if (selectedCloudGpu && totalCloudHours > 0) {
+    const cloudCostUSD = new Decimal(totalCloudHours).times(selectedCloudGpu.costPerHourUSD)
+    cloudCostIDR = cloudCostUSD.times(exchangeRateUSDTtoIDR).round().toNumber()
+  }
 
+  // Calculate electricity cost for all selected local GPUs
+  const totalPowerDrawWatts = calculateTotalPowerDraw(selectedLocalGpus)
   const electricityKWh = new Decimal(totalLocalHours)
-    .times(gpuConfig.local.powerDrawWatts)
+    .times(totalPowerDrawWatts)
     .dividedBy(1000)
   const electricityCostIDR = electricityKWh
-    .times(gpuConfig.electricityRateIDR)
+    .times(electricityRateIDR)
     .round()
     .toNumber()
 
@@ -85,10 +112,12 @@ export function calculateBatchEstimate(input: BatchEstimateInput): BatchEstimate
 
   let feasibilityNote: string
   if (isFeasible) {
-    if (cloudGpusRequired === 0) {
-      feasibilityNote = 'Can complete with local GPU only'
+    if (cloudGpusRequired === 0 && selectedLocalGpus.length > 0) {
+      feasibilityNote = `Can complete with ${selectedLocalGpus.length} local GPU${selectedLocalGpus.length > 1 ? 's' : ''} only`
+    } else if (cloudGpusRequired > 0 && selectedCloudGpu) {
+      feasibilityNote = `Need ${cloudGpusRequired}× ${selectedCloudGpu.name}`
     } else {
-      feasibilityNote = `Need ${cloudGpusRequired} cloud GPU${cloudGpusRequired > 1 ? 's' : ''}`
+      feasibilityNote = 'Select GPUs to see estimate'
     }
   } else {
     feasibilityNote = 'Need more GPUs or longer deadline'

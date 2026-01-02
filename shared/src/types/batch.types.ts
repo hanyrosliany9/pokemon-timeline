@@ -5,23 +5,31 @@ import { BatchStatus } from '../enums/batch.enum'
 // ============================================================================
 
 export interface LocalGpuConfig {
-  enabled: boolean
+  id: string                // UUID for identification
   name: string              // e.g., "RTX 3060 Ti"
   renderTimeMinutes: number // e.g., 14
   powerDrawWatts: number    // e.g., 300
 }
 
 export interface CloudGpuConfig {
+  id: string                // UUID for identification
   name: string              // e.g., "RTX 5090"
   renderTimeMinutes: number // e.g., 2.5
   costPerHourUSD: number    // e.g., 0.36
 }
 
 export interface GpuConfig {
-  local: LocalGpuConfig
-  cloud: CloudGpuConfig
-  electricityRateIDR: number // e.g., 1600 (Rp/kWh)
+  localGpus: LocalGpuConfig[]   // Multiple local GPUs
+  cloudGpus: CloudGpuConfig[]   // Multiple cloud GPU options
+  electricityRateIDR: number    // e.g., 1600 (Rp/kWh)
 }
+
+// Preset cloud GPUs for quick-add
+export const CLOUD_GPU_PRESETS: Omit<CloudGpuConfig, 'id'>[] = [
+  { name: 'RTX 5090', renderTimeMinutes: 2.5, costPerHourUSD: 0.36 },
+  { name: 'RTX 4090', renderTimeMinutes: 3, costPerHourUSD: 0.28 },
+  { name: 'A100 40GB', renderTimeMinutes: 1.5, costPerHourUSD: 0.85 },
+]
 
 // ============================================================================
 // Batch Estimation (client-side calculation)
@@ -31,8 +39,9 @@ export interface BatchEstimateInput {
   cardsCount: number
   deadlineDays: number
   pricePerCardUSDT: number
-  useLocalGpu: boolean
-  gpuConfig: GpuConfig
+  selectedLocalGpus: LocalGpuConfig[]  // User-selected local GPUs for this batch
+  selectedCloudGpu: CloudGpuConfig | null  // User-selected cloud GPU (or null if not using cloud)
+  electricityRateIDR: number
   exchangeRateUSDTtoIDR: number
 }
 

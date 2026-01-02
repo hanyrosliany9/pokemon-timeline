@@ -1,4 +1,4 @@
-import { FolderKanban, Wallet, Tags } from 'lucide-react'
+import { FolderKanban, Wallet, Settings } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +13,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
   ]
 
   const settingsItems = [
-    { to: '/settings', icon: Tags, label: 'Categories' },
+    { to: '/settings', icon: Settings, label: 'Settings' },
   ]
 
   return (

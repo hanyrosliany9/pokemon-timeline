@@ -3,7 +3,7 @@ import { useStore } from '@/store/store'
 import { useToast } from '@/hooks/use-toast'
 import { calculateBatchEstimate, formatIDR, formatPercent } from '@/services/batchCalculator'
 import { batchService } from '@/services/batch.service'
-import { CardProject } from '@pokemon-timeline/shared'
+import { CardProject, LocalGpuConfig, CloudGpuConfig } from '@pokemon-timeline/shared'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Cpu,
   Cloud,
   TrendingUp,
@@ -24,6 +31,7 @@ import {
   CheckCircle2,
   Calendar,
   Hash,
+  Zap,
 } from 'lucide-react'
 
 interface NewBatchModalProps {
@@ -47,24 +55,62 @@ export default function NewBatchModal({ isOpen, onClose, project }: NewBatchModa
   // Form state
   const [cardsCount, setCardsCount] = useState('')
   const [deadlineDays, setDeadlineDays] = useState('')
-  const [useLocalGpu, setUseLocalGpu] = useState(gpuConfig.local.enabled)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Get price per card from project
-  const pricePerCardUSDT = project.pricePerCardUSDT
-    ? parseFloat(String(project.pricePerCardUSDT))
-    : 0
+  // Multi-GPU selection state
+  // Default: all local GPUs selected, first cloud GPU selected (if any)
+  const [selectedLocalGpuIds, setSelectedLocalGpuIds] = useState<Set<string>>(
+    () => new Set(gpuConfig.localGpus.map((gpu) => gpu.id))
+  )
+  const [selectedCloudGpuId, setSelectedCloudGpuId] = useState<string | null>(
+    () => gpuConfig.cloudGpus[0]?.id ?? null
+  )
 
-  // Calculate exchange rate
-  const currentRate = parseFloat(exchangeRate || '16691')
+  // Get selected GPU objects for calculations
+  const selectedLocalGpus: LocalGpuConfig[] = useMemo(
+    () => gpuConfig.localGpus.filter((gpu) => selectedLocalGpuIds.has(gpu.id)),
+    [gpuConfig.localGpus, selectedLocalGpuIds]
+  )
+
+  const selectedCloudGpu: CloudGpuConfig | null = useMemo(
+    () => gpuConfig.cloudGpus.find((gpu) => gpu.id === selectedCloudGpuId) ?? null,
+    [gpuConfig.cloudGpus, selectedCloudGpuId]
+  )
+
+  // Toggle local GPU selection
+  const toggleLocalGpu = (gpuId: string) => {
+    setSelectedLocalGpuIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(gpuId)) {
+        next.delete(gpuId)
+      } else {
+        next.add(gpuId)
+      }
+      return next
+    })
+  }
+
+  // Get price per card from project (handle null/undefined/NaN)
+  const pricePerCardUSDT = useMemo(() => {
+    if (project.pricePerCardUSDT == null) return 0
+    const parsed = parseFloat(String(project.pricePerCardUSDT))
+    return isNaN(parsed) ? 0 : parsed
+  }, [project.pricePerCardUSDT])
+
+  // Calculate exchange rate (with fallback)
+  const currentRate = useMemo(() => {
+    const parsed = parseFloat(exchangeRate || '16691')
+    return isNaN(parsed) ? 16691 : parsed
+  }, [exchangeRate])
 
   // Calculate estimate on input change
   const estimate = useMemo(() => {
     const cards = parseInt(cardsCount)
     const days = parseInt(deadlineDays)
 
-    if (!cards || cards <= 0 || !days || days <= 0 || pricePerCardUSDT <= 0) {
+    // Validate inputs - isNaN check catches NaN values that slip through
+    if (!cards || cards <= 0 || !days || days <= 0 || isNaN(pricePerCardUSDT) || pricePerCardUSDT <= 0) {
       return null
     }
 
@@ -72,11 +118,12 @@ export default function NewBatchModal({ isOpen, onClose, project }: NewBatchModa
       cardsCount: cards,
       deadlineDays: days,
       pricePerCardUSDT,
-      useLocalGpu,
-      gpuConfig,
+      selectedLocalGpus,
+      selectedCloudGpu,
+      electricityRateIDR: gpuConfig.electricityRateIDR,
       exchangeRateUSDTtoIDR: currentRate,
     })
-  }, [cardsCount, deadlineDays, useLocalGpu, gpuConfig, currentRate, pricePerCardUSDT])
+  }, [cardsCount, deadlineDays, selectedLocalGpus, selectedCloudGpu, gpuConfig.electricityRateIDR, currentRate, pricePerCardUSDT])
 
   // Calculate deadline date
   const deadlineDate = useMemo(() => {
@@ -115,7 +162,7 @@ export default function NewBatchModal({ isOpen, onClose, project }: NewBatchModa
         projectId: project.id,
         cardsCount: parseInt(cardsCount),
         deadlineAt: deadlineDate!.toISOString(),
-        useLocalGpu,
+        useLocalGpu: selectedLocalGpus.length > 0,
         cloudGpusPlanned: estimate.cloudGpusRequired,
         cloudHoursPlanned: estimate.totalCloudHours,
         exchangeRateUsed: currentRate,
@@ -167,8 +214,8 @@ export default function NewBatchModal({ isOpen, onClose, project }: NewBatchModa
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Input Section */}
-          <div className="grid grid-cols-3 gap-4 p-4 bg-bg-secondary rounded-lg border border-border">
+          {/* Batch Details Section */}
+          <div className="grid grid-cols-2 gap-4 p-4 bg-bg-secondary rounded-lg border border-border">
             <div className="space-y-2">
               <Label htmlFor="cards" className="text-xs font-medium">
                 Cards Count *
@@ -206,18 +253,77 @@ export default function NewBatchModal({ isOpen, onClose, project }: NewBatchModa
                 </p>
               )}
             </div>
+          </div>
+
+          {/* GPU Selection Section */}
+          <div className="space-y-4 p-4 bg-bg-secondary rounded-lg border border-border">
+            <h4 className="font-medium text-sm">GPU Selection</h4>
+
+            {/* Local GPUs */}
             <div className="space-y-2">
-              <Label className="text-xs font-medium">Use Local GPU</Label>
-              <div className="flex items-center gap-2 pt-2">
-                <Switch
-                  checked={useLocalGpu}
-                  onCheckedChange={setUseLocalGpu}
-                  disabled={!gpuConfig.local.enabled}
-                />
-                <span className="text-sm text-text-secondary">
-                  {gpuConfig.local.name}
-                </span>
+              <div className="flex items-center gap-2 text-xs text-text-secondary">
+                <Cpu className="h-3 w-3 text-blue-500" />
+                <span>Local GPUs ({selectedLocalGpus.length} selected)</span>
               </div>
+              {gpuConfig.localGpus.length === 0 ? (
+                <p className="text-xs text-text-tertiary italic">
+                  No local GPUs configured. Add them in Settings.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {gpuConfig.localGpus.map((gpu) => (
+                    <div
+                      key={gpu.id}
+                      className="flex items-center justify-between p-2 bg-bg-primary rounded border border-border"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={selectedLocalGpuIds.has(gpu.id)}
+                          onCheckedChange={() => toggleLocalGpu(gpu.id)}
+                        />
+                        <span className="text-sm font-medium">{gpu.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-text-secondary">
+                        <span>{gpu.renderTimeMinutes} min/card</span>
+                        <span className="flex items-center gap-1">
+                          <Zap className="h-3 w-3 text-yellow-500" />
+                          {gpu.powerDrawWatts}W
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cloud GPU */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-text-secondary">
+                <Cloud className="h-3 w-3 text-purple-500" />
+                <span>Cloud GPU (for overflow capacity)</span>
+              </div>
+              {gpuConfig.cloudGpus.length === 0 ? (
+                <p className="text-xs text-text-tertiary italic">
+                  No cloud GPUs configured. Add them in Settings.
+                </p>
+              ) : (
+                <Select
+                  value={selectedCloudGpuId ?? 'none'}
+                  onValueChange={(val) => setSelectedCloudGpuId(val === 'none' ? null : val)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select cloud GPU" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No cloud GPU (local only)</SelectItem>
+                    {gpuConfig.cloudGpus.map((gpu) => (
+                      <SelectItem key={gpu.id} value={gpu.id}>
+                        {gpu.name} • {gpu.renderTimeMinutes} min • ${gpu.costPerHourUSD}/hr
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -264,25 +370,41 @@ export default function NewBatchModal({ isOpen, onClose, project }: NewBatchModa
                     <p className="text-text-secondary">Required throughput</p>
                     <p className="font-medium">{estimate.cardsPerDayRequired.toLocaleString()} cards/day</p>
                   </div>
-                  {useLocalGpu && gpuConfig.local.enabled && (
+                  {selectedLocalGpus.length > 0 && (
                     <div>
                       <p className="text-text-secondary">Local capacity</p>
-                      <p className="font-medium">{estimate.localGpuCardsPerDay.toLocaleString()} cards/day</p>
+                      <p className="font-medium">
+                        {estimate.localGpuCardsPerDay.toLocaleString()} cards/day
+                        <span className="text-xs text-text-tertiary ml-1">
+                          ({selectedLocalGpus.length} GPU{selectedLocalGpus.length > 1 ? 's' : ''})
+                        </span>
+                      </p>
                     </div>
                   )}
-                  <div>
-                    <p className="text-text-secondary flex items-center gap-1">
-                      <Cloud className="h-3 w-3" />
-                      Cloud GPUs needed
-                    </p>
-                    <p className="font-medium text-lg">
-                      {estimate.cloudGpusRequired}x {gpuConfig.cloud.name}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-text-secondary">Total cloud hours</p>
-                    <p className="font-medium">{estimate.totalCloudHours} hours</p>
-                  </div>
+                  {selectedCloudGpu && (
+                    <>
+                      <div>
+                        <p className="text-text-secondary flex items-center gap-1">
+                          <Cloud className="h-3 w-3" />
+                          Cloud GPUs needed
+                        </p>
+                        <p className="font-medium text-lg">
+                          {estimate.cloudGpusRequired}x {selectedCloudGpu.name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-text-secondary">Total cloud hours</p>
+                        <p className="font-medium">{estimate.totalCloudHours} hours</p>
+                      </div>
+                    </>
+                  )}
+                  {!selectedCloudGpu && estimate.cloudCardsPerDayNeeded > 0 && (
+                    <div className="col-span-2">
+                      <p className="text-yellow-600 dark:text-yellow-400 text-xs">
+                        Need {estimate.cloudCardsPerDayNeeded} more cards/day capacity. Select a cloud GPU.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -290,11 +412,13 @@ export default function NewBatchModal({ isOpen, onClose, project }: NewBatchModa
               <div className="p-4 bg-bg-secondary rounded-lg border border-border">
                 <h4 className="font-medium mb-3">Projected Costs (IDR)</h4>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Cloud GPU</span>
-                    <span>{formatIDR(estimate.cloudCostIDR)}</span>
-                  </div>
-                  {useLocalGpu && estimate.electricityCostIDR > 0 && (
+                  {selectedCloudGpu && estimate.cloudCostIDR > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Cloud GPU</span>
+                      <span>{formatIDR(estimate.cloudCostIDR)}</span>
+                    </div>
+                  )}
+                  {selectedLocalGpus.length > 0 && estimate.electricityCostIDR > 0 && (
                     <div className="flex justify-between">
                       <span className="text-text-secondary">Electricity</span>
                       <span>{formatIDR(estimate.electricityCostIDR)}</span>
