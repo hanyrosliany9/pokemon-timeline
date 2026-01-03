@@ -37,6 +37,27 @@ export const useStore = create<Store>()(
           income: state.income,
           gpuConfig: state.gpuConfig,
         }),
+        // Merge persisted state with defaults to handle schema changes
+        merge: (persistedState, currentState) => {
+          const persisted = persistedState as Partial<Store> | undefined
+          return {
+            ...currentState,
+            ...persisted,
+            // Ensure arrays are always arrays (fixes corrupted localStorage)
+            expenses: Array.isArray(persisted?.expenses) ? persisted.expenses : [],
+            income: Array.isArray(persisted?.income) ? persisted.income : [],
+            // Ensure gpuConfig has proper structure
+            gpuConfig: {
+              localGpus: Array.isArray(persisted?.gpuConfig?.localGpus)
+                ? persisted.gpuConfig.localGpus
+                : currentState.gpuConfig.localGpus,
+              cloudGpus: Array.isArray(persisted?.gpuConfig?.cloudGpus)
+                ? persisted.gpuConfig.cloudGpus
+                : currentState.gpuConfig.cloudGpus,
+              electricityRateIDR: persisted?.gpuConfig?.electricityRateIDR ?? currentState.gpuConfig.electricityRateIDR,
+            },
+          }
+        },
       },
     ),
   ),
