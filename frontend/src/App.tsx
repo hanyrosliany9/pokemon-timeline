@@ -6,6 +6,7 @@ import Layout from './components/layout/Layout'
 import { ProjectDashboard } from './components/project'
 import ExpenseDashboard from './components/expense/ExpenseDashboard'
 import SettingsPage from './pages/SettingsPage'
+import SecretPage from './pages/SecretPage'
 import './App.css'
 
 function App() {
@@ -33,6 +34,9 @@ function App() {
     <div className="app">
       <BrowserRouter>
         <Routes>
+          {/* Secret page - no layout, standalone */}
+          <Route path="/secret" element={<SecretPage />} />
+
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/projects" replace />} />
             <Route path="projects" element={<ProjectDashboard />} />
