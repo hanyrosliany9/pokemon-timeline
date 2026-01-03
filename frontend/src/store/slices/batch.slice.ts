@@ -113,10 +113,12 @@ export const createBatchSlice: StateCreator<BatchSlice> = (set, get) => ({
   selectedBatch: null,
 
   setBatches: (projectId: string, batches: RenderingBatch[]) => {
+    // Defensive: ensure batches is always an array
+    const safeBatches = Array.isArray(batches) ? batches : []
     set((state) => ({
       batches: {
         ...state.batches,
-        [projectId]: batches,
+        [projectId]: safeBatches,
       },
     }))
   },

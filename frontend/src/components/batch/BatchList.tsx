@@ -52,6 +52,8 @@ export default function BatchList({ projectId, onAddBatch, onSelectBatch }: Batc
 
   // Calculate actual costs for each batch
   const getActualCost = (batchId: string) => {
+    // Defensive: ensure expenses is an array
+    if (!Array.isArray(expenses)) return 0
     return expenses
       .filter((e) => e.batchId === batchId)
       .reduce((sum, e) => sum + parseFloat(String(e.amountIDR || '0')), 0)
