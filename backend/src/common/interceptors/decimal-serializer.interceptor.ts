@@ -23,6 +23,11 @@ export class DecimalSerializerInterceptor implements NestInterceptor {
       return obj.toString()
     }
 
+    // Handle Date instances - convert to ISO string
+    if (obj instanceof Date) {
+      return obj.toISOString()
+    }
+
     // Handle arrays
     if (Array.isArray(obj)) {
       return obj.map((item) => this.transformDecimal(item))
